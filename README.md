@@ -41,7 +41,7 @@ master. The FM-1's TRS jack is MIDI in only; MIDI out is over USB.
 
 The FM-1 connects by USB; no extra hardware. Installing any firmware is at your own risk.
 
-- Web installer: the fork of Felucca's installer page (coming with the first release).
+- Web installer: https://rudimentseq.github.io/RudimentSeq-FM1/ (Chrome or Edge, Web MIDI; the same page as Felucca's, built from this tree by `web/make_site.py`).
 - From this tree, after [building](BUILDING.md): `python3 tools/fm1_install.py build/felucca.fwsc`
   (the package is named after upstream; the device reports itself as **RudimentSeq** on the MIDI
   bus and as FM-1_900 to installers, like Felucca).
