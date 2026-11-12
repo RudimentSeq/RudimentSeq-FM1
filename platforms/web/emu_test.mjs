@@ -50,6 +50,7 @@ async function device(saved) {
   d.screen = () => new Uint16Array(mem.buffer, ex.fh_screen(), 240 * 240).slice();
   return d;
 }
+const BOOT_MS = 2800;                                        // RudimentSeq: past the 2.5 s splash (was 1200 for 0.43 s)
 const colours = (fb) => new Set(fb).size;
 
 // ---- boot, keys, screen, LEDs
@@ -152,8 +153,8 @@ check("a fresh instance with the kept sectors has it; one without does not",
         ["bin", "twos", "sign"].every((m) => k(MASTER_CC, 0, m).master === 0 && k(MASTER_CC, 127, m).master === 1023) &&
         k(20, 65, "bin").role === EN.SELECT && k(26, 65, "bin").role === EN.K4 && k(19, 65, "bin") === null);
   const t = await device(null), u = await device(null);             // u: left alone
-  t.render(1200);
-  u.render(1200);
+  t.render(BOOT_MS);
+  u.render(BOOT_MS);
   t.render(40);
   t.turn(EN.PRESETS, 3);
   t.render(300);
@@ -161,7 +162,7 @@ check("a fresh instance with the kept sectors has it; one without does not",
   const ts = t.screen(), us = u.screen();
   for (const [mode, vs] of [["abs", [64, 65, 66, 67]], ["bin", [65, 65, 65]], ["twos", [1, 1, 1]], ["sign", [1, 1, 1]]]) {
     const m = await device(null), knob = [];                   // a controller's knob: three detents
-    m.render(1200);
+    m.render(BOOT_MS);
     for (const v of vs) {
       const r = midiKnob(knob, cc, v, mode);
       if (r.n) m.ex.fh_enc(r.role, r.n);

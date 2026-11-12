@@ -621,7 +621,10 @@ static void draw_column_tall(uint32_t c, const char *label, const char *val, con
         vy = vf == &AF_L ? LG_VB - AF_L_CAP_Y : vf == &AF_M ? LG_VB + HALF_UP(AF_L_CAP_H - AF_M_CAP_H) - AF_M_CAP_Y
                                                           : LG_VB + HALF_UP(AF_L_CAP_H - AF_S_CAP_H) - AF_S_CAP_Y;
         if (vf == &AF_S && ink_w(vf, val) > COL_W - 4) {   /* (a value always fits: the lint reports one cut) */
-            cv_text_fit(2, vy, vf, val, vc, T_SURF, COL_W - 4);
+            if (fmt_free)                               /* RudiSeq: a rudiment's name is free text, ellipsised here */
+                cv_free_text(2, vy, vf, val, vc, T_SURF, COL_W - 4);
+            else
+                cv_text_fit(2, vy, vf, val, vc, T_SURF, COL_W - 4);
         } else {
             GFX_HOOK_ALIGN(0, LG_VB, COL_W, LG_VB + AF_L_CAP_H, AL_HV, "large card value centred");
             cv_text_in(0, vy, COL_W, vf, val, vc, T_SURF);
@@ -651,7 +654,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
                         int32_t ratio, uint32_t icon)
 {
     char key[48];
-    int hot = c == ui.hot_col && ui.hot_t, named = fmt_named, mot = card_mot_next && label[0], strip, snap;
+    int hot = c == ui.hot_col && ui.hot_t, named = fmt_named, free = fmt_free, mot = card_mot_next && label[0], strip, snap;
     uint32_t kind = large_kind();                       /* MENU > LARGE: tall (draw_column_tall), or the label in M */
     uint8_t sig;
     uint16_t lc = hot ? T_ACCENT : T_MID;
@@ -757,7 +760,8 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
                 GFX_HOOK_ALIGN(0, ROLL_Y, COL_W, ROLL_Y + ROLL_H, AL_V, "card value in its roll window");
             x = roll_text(c, 5, 17, val, vc);
         } else
-            x = cv_text_fit(5, 20, vf, val, vc, T_SURF, room - uw);
+            x = free ? cv_free_text(5, 20, vf, val, vc, T_SURF, room - uw)   /* RudiSeq: a rudiment's name may ellipsise */
+                     : cv_text_fit(5, 20, vf, val, vc, T_SURF, room - uw);
         if (unit[0]) {
             GFX_HOOK_ALIGN(0, 0, 0, vf == &AF_M ? 17 + AF_M.asc : 20 + AF_S.asc, AL_B, "card unit on its value's baseline");
             cv_text_on(x + 3, 20, &AF_S, unit, T_MID, T_SURF);     /* on the value's baseline (S) */
@@ -770,6 +774,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     }
     cv_oy = 0;
     cv_blit((uint32_t)CARD_X(c), Y_LABEL + (strip ? ROLL_Y : 0));
+    fmt_free = 0;                                       /* (params.c: for this card only, as fmt_named) */
 }
 
 /* an action's column (act_cols): picked, the OCT+ keycap (accent while it would do something); else "--" */

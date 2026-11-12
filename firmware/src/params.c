@@ -343,12 +343,14 @@ static int32_t param_turn(const param_desc_t *d, int32_t v, int32_t steps)
 }
 
 static uint8_t fmt_named;        /* the last param_format was a name (F_ENUM, even "4"): ui_draw.c's digits do not roll it */
+static uint8_t fmt_free;         /* RudiSeq: .. was free text (a rudiment's name): MENU > LARGE may ellipsise it (ui_draw.c) */
 
 /* value string (<= 5 chars) and unit for a parameter value */
 static void param_format(const param_desc_t *d, int32_t v, char *val, const char **unit)
 {
     *unit = "";
     fmt_named = d->fmt == F_ENUM;
+    fmt_free = d == &TP[P_RUDI];
     if (d == &TP[P_RUDI]) {                         /* RudiSeq: the rudiment's short name, not its index */
         str_cpy(val, RUDIMENTS[(uint32_t)v % NUM_RUDIMENTS].sname, 10);
         fmt_named = 1;

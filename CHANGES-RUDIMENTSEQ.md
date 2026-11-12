@@ -60,3 +60,11 @@ M-VAVE's updater and the recovery paths all still apply.
 - `platforms/host/felucca_host.c`, `platforms/sdl/felucca_sdl.c`, `platforms/libretro/lr_check.c`,
   `platforms/web/emu_test.mjs`, `tests/ui_render.c`: follow the new length and layout; the GREY / MONO pixel lint
   skips the splash (its colours are fixed in every palette).
+
+## 2026-11-12: CI
+
+- `platforms/web/emu_test.mjs`: the controller-knob checks boot their devices past the 2.5 s splash (they turned the
+  knob under it).
+- `firmware/src/params.c`, `firmware/src/ui_draw.c`: a rudiment's name is free text to the layout lint (fmt_free), so
+  a long one may ellipsise on its card, plain and MENU > LARGE, like a preset name. No change on the screen.
+
