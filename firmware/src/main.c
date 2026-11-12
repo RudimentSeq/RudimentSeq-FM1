@@ -163,10 +163,14 @@ static void fm1_main(void)
         settings_save();
     }
     autosave_boot(boot_clean);                /* (1.2) the last session's music, under the splash */
-    for (ms = 0; ms < 400u; ms += 10u) {      /* the splash; the pot followed (MIDI IN plays under it) */
+    for (ms = 0; ms < RUDISEQ_SPLASH_MS; ms += 10u) {   /* the splash; the pot followed (MIDI IN plays under it) */
         fm1_delay_ms(10);
         master_poll();
+        if (ms >= RUDISEQ_SPLASH_SKIP_MS && (fm1_in.notes | fm1_in.buttons))
+            break;                            /* RudimentSeq: a key or button ends it (#137: the key sounds nothing) */
     }
+    for (ms = 0; ms < 500u && (fm1_in.notes | fm1_in.buttons); ms += 10u)
+        fm1_delay_ms(10);                     /* .. released before the UI reads it (a stuck one: on after 0.5 s) */
     kb_boot_hold = 0;
     lcd_fill(0, 0, 240, 240, T_BG);
     scrn.idle = fm1_ms;                        /* (MENU > SCREEN OFF: from here) */

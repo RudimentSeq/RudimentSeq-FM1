@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Build Felucca: the app, the update loader and an installable .fwsc package.
@@ -213,6 +214,9 @@ def build_app():
     if v in ("0", "1", "2", "3"):
         flags.append(f"-DFELUCCA_USB_LAYOUT={v}")
     flags.append(f'-DFELUCCA_ID="{PRODUCT}"')
+    # RudimentSeq: the USB product string, i.e. the MIDI port name (usb.c string descriptor 2); FELUCCA_USB_PRODUCT=Felucca
+    # in the environment builds a port named as upstream. tools/fm1_install.py and the web pages accept both names.
+    flags.append(f'-DFELUCCA_USB_PRODUCT="{os.environ.get("FELUCCA_USB_PRODUCT", "RudimentSeq")}"')
     if VERSION:
         flags.append(f'-DFELUCCA_VERSION="{VERSION}"')
     # felucca.c goes to LLVM IR without the optimizer, the main-loop functions (UI, stores, editor) are

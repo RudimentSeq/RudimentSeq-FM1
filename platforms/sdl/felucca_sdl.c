@@ -152,7 +152,7 @@ static int sdl_headless(uint32_t ms, int file)
     else
         fh_nor_erase();
     fh_boot();
-    for (k = 0; k < 2000u; k += 10u)
+    for (k = 0; k < 3100u; k += 10u)
         fh_render(441);
     at_boot = fh_test_user_preset(0);
     fh_test_heavy();                              /* (emu_test.mjs: the heavy song) */
@@ -199,7 +199,7 @@ static int sdl_engines_check(void)
     uint32_t j, p, k, i, n;
     fh_nor_erase();
     fh_boot();
-    for (k = 0; k < 2000u; k += 10u)
+    for (k = 0; k < 3100u; k += 10u)
         fh_render(441);
     sdl_tap(B_PLAY);
     for (j = 0; j < sizeof ENG; j++) {
@@ -229,7 +229,7 @@ static int sdl_plugins_check(void)
     uint32_t n, k, i, e, bad = 0;
     fh_nor_erase();
     fh_boot();
-    for (k = 0; k < 2000u; k += 10u)
+    for (k = 0; k < 3100u; k += 10u)
         fh_render(441);
     sdl_tap(B_PLAY);
     printf("plugins: %u engines listed, %u of Felucca's\n", eng_nshown(), (unsigned)NENG_SHOWN);
@@ -267,7 +267,7 @@ static int sdl_project_check(void)
     const fe_plugin_t *d;
     fh_nor_erase();
     fh_boot();
-    for (k = 0; k < 2000u; k += 10u)
+    for (k = 0; k < 3100u; k += 10u)
         fh_render(441);
     if (eng_nshown() <= NENG_SHOWN) {
         printf("project: no plugin of its own loaded\n");
@@ -425,7 +425,7 @@ static int sdl_shot(const char *path, int w, int h, int layout, uint32_t ms, int
     panel_layout(&pnl, layout < 0 ? panel_fit(w, h) : layout);
     fh_nor_erase();
     fh_boot();
-    for (k = 0; k < 2000u; k += 10u)
+    for (k = 0; k < 3100u; k += 10u)
         fh_render(441);
     fh_test_heavy();
     sdl_tap(B_PLAY);

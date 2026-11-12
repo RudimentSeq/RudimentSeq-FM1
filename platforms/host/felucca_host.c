@@ -286,7 +286,7 @@ static void fh_power_on(void)
     audio_init();
     boot_leds();                          /* main.c: the power-on LED sweep, from the scan's start */
     autosave_boot(boot_clean);            /* main.c: the last session's music (1.2, project.c) */
-    fh_boot_ms = fm1_ms + 430u;         /* main.c: 30 + 400 ms before the first frame */
+    fh_boot_ms = fm1_ms + 30u + RUDISEQ_SPLASH_MS;   /* main.c: 30 ms + the splash before the first frame */
     fh_on = 1;
 }
 

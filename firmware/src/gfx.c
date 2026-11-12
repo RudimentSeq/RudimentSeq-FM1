@@ -507,11 +507,10 @@ static int32_t glyph_at(const aafont_t *f, uint32_t ch)
  * else '?', else the face's first glyph (L is sparse: its space) */
 static uint32_t glyph(const aafont_t *f, uint32_t ch)
 {
-    int32_t k;
-    if (ch >= 'a' && ch <= 'z' && f->last < 'a')
-        ch -= 32u;                                   /* L has capitals only */
-    if ((k = glyph_at(f, ch)) < 0 && (ch != (uint8_t)ELLIPSIS || (k = glyph_at(f, '.')) < 0) &&
-        (k = glyph_at(f, '?')) < 0)
+    int32_t k = glyph_at(f, ch);
+    if (k < 0 && ch >= 'a' && ch <= 'z')
+        k = glyph_at(f, ch - 32u);                   /* L: its capital for a lower case it lacks (RudimentSeq: it has some) */
+    if (k < 0 && (ch != (uint8_t)ELLIPSIS || (k = glyph_at(f, '.')) < 0) && (k = glyph_at(f, '?')) < 0)
         k = 0;
     return (uint32_t)k << f->psh;
 }
@@ -531,7 +530,7 @@ static int32_t kern(const aafont_t *f, uint32_t a, uint32_t b)       /* 1/16 px 
     return 0;
 }
 
-static uint32_t fold(const aafont_t *f, uint32_t c) { return c >= 'a' && c <= 'z' && f->last < 'a' ? c - 32u : c; }
+static uint32_t fold(const aafont_t *f, uint32_t c) { return c >= 'a' && c <= 'z' && glyph_at(f, c) < 0 ? c - 32u : c; }   /* (as glyph) */
 
 static int32_t text_w(const aafont_t *f, const char *s)
 {

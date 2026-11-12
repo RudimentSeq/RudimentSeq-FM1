@@ -1,10 +1,23 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* FELUCCA core types: tracks, voices, engines, parameters.
  * Four tracks, each a synth part: its own engine, preset, parameters, voices and 64-step
  * pattern. The parts share one budget of NVOICE sounding voices (voice.c). Drums are the DRUM
  * engine (General MIDI map) on any part; the SAMPLE engine's PERC set is retired (drum_from_perc).
  * Sections: sizes, parameters, voices and engines, tracks and the song, system. */
+/* RudimentSeq: this fork's own identity (the splash, the about page, the console banner, the editor's INFO).
+ * The USB product string (the MIDI port name) is FELUCCA_USB_PRODUCT, set by tools/build.py to RUDISEQ_NAME. */
+#define RUDISEQ_NAME "RudimentSeq"
+#define RUDISEQ_NAME_CAPS "RUDIMENTSEQ"   /* the about page's title */
+#define RUDISEQ_SPLASH_MS 2500u          /* the splash stays this long (main.c; the host platforms follow) */
+#define RUDISEQ_SPLASH_SKIP_MS 500u      /* .. a key or button after this ends it early */
+#ifndef RUDISEQ_VERSION
+#define RUDISEQ_VERSION "r0.1"     /* the fork's release; FELUCCA_VERSION (felucca.c / build.py) is the upstream it is built on */
+#endif
+#define RUDISEQ_AUTHOR "jem@rudimentseq.com"      /* the credit line on the about page */
+#define RUDISEQ_URL "rudimentseq.com"             /* the project site; the repository is linked from it */
+
 #include <stdint.h>
 
 /* ------------------------------------------------------------ sizes --- */
@@ -103,6 +116,8 @@ enum {                          /* per-track parameters */
     P_FTYPE,                                   /* 1.5 (#104): ANALOG's filter TYPE, LP (as before) / BP / HP (eng_analog.c) */
     P_ESYNC,                                   /* 1.5 (#175): ENV SYNC: ATK DEC REL as note values of the tempo (voice.c) */
     P_ATSNS, P_ATDST, P_ATAMT,                 /* 1.8: AFTERTOUCH: the keys' pressure (keytouch.c) and its routing (mod.c) */
+    P_RUDION, P_RUDI, P_RUDPR, P_RUDPL,        /* RudiSeq (rudi.c): rudi mode, the rudiment, R / L hand probability */
+    P_RUDSMA, P_RUDFEA, P_RUDNR, P_RUDNL,      /* .. Smart Prob, feather (ghost notes), the hands' notes */
     P_E0, P_E1, P_E2, P_E3, P_E4, P_E5, P_E6, P_E7,
     P_COUNT
 };
@@ -254,7 +269,8 @@ static void step_set_nudge(step_t *s, int32_t v)
     uint32_t u = (uint32_t)(v < -8 ? -8 : v > 7 ? 7 : v) & 15u;
     s->flags = (uint8_t)((s->flags & ~SF_NUDGE) | (u & 7u) << 5 | (u >> 1 & 4u));
 }
-#define MOTION_MAX 128u          /* 1.2 (FUN10): 64 before */
+#define MOTION_MAX 114u          /* 1.2 (FUN10): 64 before, 128 in 1.2..1.8; 1.8 trimmed to 114 so the saved
+                                  * project store has room for the eight rudiment parameters (still ~1.8x the 1.1 limit) */
 /* Four tracks x64 steps fit one byte. Values retain their signed parameter range (-64..127: an int8_t, 1.2).
  * param: the P_* id (< 128: P_COUNT is at most 127, project.c), bit 7 (MOTION_LOCK, 1.1) a parameter lock: the value
  * sounds on that step only and goes back after it (motion.c motion_step); without it an automation event, the
@@ -263,7 +279,7 @@ static void step_set_nudge(step_t *s, int32_t v)
 #define MOTION_ID(e) ((uint32_t)(e)->param & 0x7Fu)
 typedef struct { uint8_t place, param; int8_t value; } motion_event_t;
 typedef struct { uint8_t count, on, rsv[2]; motion_event_t event[MOTION_MAX]; } motion_store_t;
-_Static_assert(sizeof(motion_store_t) == 388u, "motion disk layout (FUN10)");
+_Static_assert(sizeof(motion_store_t) == 346u, "motion disk layout (FUN10)");
 #define CHAIN_ROWS 16u
 /* A song section (1.2, FUN10): the PROJECT slot each track plays (0..3, A..D; CHAIN_SILENT "-": that track plays
  * nothing there) and its repeats (1..16). Up to 1.1 a row was {slot, repeat}, all four tracks on that slot
@@ -424,3 +440,5 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
 /* boot-loop guard (main.c): two boots in a row that die in the first 30 s -> UBOOT */
 #define BOOTGUARD_MAGIC 0x42475244u
 struct { uint32_t magic, failed, pending; } bootguard __attribute__((section(".noinit")));
+
+#include "rudi_data.h"           /* RudiSeq: the 174 rudiments (params.c ranges, rudi.c plays them, ui_graph.c draws them) */

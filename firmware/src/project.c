@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Projects: four slots. The slots live in .noinit RAM: they
  * survive resets and UBOOT entry. With FELUCCA_FLASH (default) every save
  * also goes to flash through storage.c, and an
@@ -108,6 +109,13 @@
 #define PROJ_NG_V2 27u                         /* G_COUNT of formats 1 and 2 */
 #define PROJ_NP_V3 57u                         /* P_COUNT of format 3 (P_E0 was 49) */
 #define PROJ_NP_V4 69u                         /* P_COUNT of format 4 (P_E0 61) */
+/* 1.8 (RudiSeq, #16): the eight rudiment parameters P_RUDION..P_RUDNL ARE saved per project, like every other
+ * track parameter. Room was made in the fixed 3840-byte FUN10 object by trimming the motion store from 128 to
+ * MOTION_MAX=114 events (core.h) — the param block grows 4 bytes per parameter (NTRK) while each dropped motion
+ * event frees 3, so the fit is "within PROJ_FM6_OFF", not exact. P_RUDI spans 0..173, past the old -64..127
+ * stored-byte range, so proj_pack / proj_unpack widen the biased byte to -64..191 (0..255 unsigned; the
+ * whole-store hash already guards integrity). A project now stores the whole P_COUNT. */
+#define PROJ_NP_SAVE P_COUNT                   /* a project stores every parameter, rudiments included */
 #define PROJ_PHYS 2u                           /* project_t.phys: PHYS without DUST and DRUM (see the top) */
 #define PROJ_NAME_LEN 12u                      /* the name: FUN7 bytes PROJ_NAME_OFF.. (the reserved tail's end) */
 typedef struct {                               /* one track */
@@ -615,6 +623,10 @@ static void proj_midi_unpack(project_t *q, const uint8_t *b)
         q->g[G_ROUTE] = ROUTE_TRACK;
 }
 
+/* 1.8: the motion image just written (today's ids) -> the stored, pre-rudi id space; the inverse of
+ * proj_motion_ids. A lock or automation on a rudiment parameter (P_RUDION..P_RUDNL) is dropped (rudi is never
+ * saved); one on an engine value (id >= P_E0) moves down by the eight rudi ids, its lock bit kept. In place;
+ * every motion_event_t field is a byte, so the cast needs no alignment. */
 /* A stable serialized schema: first header retains FUN6's fields; at byte66
  * np, format flags, then four byte-param tracks and nine-byte steps; FUN8: the patches at PROJ_FM6_OFF. */
 static int proj_pack(project_store_t *out, const project_t *q)
@@ -625,10 +637,10 @@ static int proj_pack(project_store_t *out, const project_t *q)
             if (q->fm6[t][i] > 127u) return 0;
     if (!chain_valid(&q->chain) || !motion_valid(&q->motion) || P_COUNT > 127u) return 0;
     memset(out, 0, sizeof *out); memcpy(b, &magic, 4); memcpy(b + 4, &size, 4);
-    memcpy(b + 8, q->g, sizeof q->g); b[62] = q->sel; b[63] = q->parts; b[64] = q->phys; b[66] = P_COUNT;
+    memcpy(b + 8, q->g, sizeof q->g); b[62] = q->sel; b[63] = q->parts; b[64] = q->phys; b[66] = PROJ_NP_SAVE;
     for (t = 0; t < NTRK; t++) {
         for (i = 0; i < P_COUNT; i++) {
-            if (q->t[t].p[i] < -64 || q->t[t].p[i] > 127) return 0;
+            if (q->t[t].p[i] < -64 || q->t[t].p[i] > NUM_RUDIMENTS - 1) return 0;   /* widest param is the rudiment index 0..NUM_RUDIMENTS-1 (biased byte) */
             b[pos++] = (uint8_t)(q->t[t].p[i] + 64);
         }
         b[pos++] = q->t[t].engine; b[pos++] = q->t[t].preset;
@@ -714,7 +726,7 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
         proj_rtype_room(q->g);
     for (t = 0; t < NTRK; t++) {
         int16_t values[P_COUNT], def[P_COUNT];
-        for (i = 0; i < np; i++) { if (b[pos] > 191u) return 0; values[i] = (int16_t)b[pos++] - 64; }
+        for (i = 0; i < np; i++) { if (b[pos] > NUM_RUDIMENTS - 1 + 64) return 0; values[i] = (int16_t)b[pos++] - 64; }   /* biased byte; widest value is the rudiment index */
         q->t[t].engine = b[pos++]; q->t[t].preset = b[pos++];
         if (q->t[t].engine >= NENGINES) return 0;
         for (i = 0; i < P_COUNT; i++) def[i] = param_desc_of(q->t[t].engine, i)->def;

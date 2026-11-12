@@ -67,6 +67,7 @@ const splash = colours(a.screen());
 }
 a.render(800);
 check("  over by 1 s (~0.70 s)", a.ex.fh_anim_levels() === 0);
+a.render(1800);                                              // RudimentSeq: the splash stays 2.5 s
 const home = a.screen();
 check(`boots: the splash, then HOME (${colours(home)} colours), the HOME LED lit`,
       splash > 1 && colours(home) > 4 && (a.ex.fh_lit_buttons() >> B.HOME & 1) === 1);

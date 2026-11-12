@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Keyboard, scale, arpeggiator, sequencer and transport.
  * Everything here runs in the audio ISR, once per CTL-sample block, and
  * ends in trk_note_on / trk_note_off: engines never see where a note came from.
@@ -37,6 +38,7 @@ static uint32_t kb_prev;
 static volatile uint8_t kb_boot_hold;    /* #137: set from power-on to the end of the splash (main.c): the keys sound nothing,
                                           * and one held across its end stays silent until it is let go and pressed again */
 static uint8_t kb_note[27], kb_trk[27];  /* per key: the note it started and on which track */
+static uint8_t kb_mo[27];                /* per key: key_on sent its notes to MIDI OUT (ARP off), so key_off ends them */
 static uint8_t in_key;                   /* the key (+ 1) whose notes go into input_on now (key_on), 0: none (MIDI IN) */
 static uint8_t kb_vel = 100;             /* 1.5.6 (#84): the keys' velocity (MENU > SELECT VEL, ui_input.c sel_play) */
 /* #191: where each track's held[i] came from, so the arp maps it again as it plays (arp_list: TRN, ROOT, SCALE, QNT as
@@ -59,6 +61,13 @@ static volatile uint8_t midi_seen;       /* 1.5.5 (#208): bit per track, a MIDI 
 
 static uint32_t trk_index(const track_t *t) { return (uint32_t)(t - trk); }
 
+/* the sequencer and RudiSeq sound a note: the track's voice and MIDI OUT, as the keys do (key_on / key_off).
+ * Defined after trk_midi_ch (rudi.c calls them first) */
+static void seq_note_on(track_t *t, uint32_t note, uint32_t vel);
+static void seq_note_off(track_t *t, uint32_t note);
+
+#include "rudi.c"                /* RudimentSeq: a track in rudi mode plays a rudiment instead of its pattern */
+
 /* MENU > MIDI > MIDI IN (G_ROUTE, up to 1.1.5 GLO > SYSTEM ROUT): the first channel (0..15) of the block of four that
  * plays tracks 1..4, -1 with SEL, -2 with TRACK (each track its own: song.mch). Stored
  * 0 CH1-4, 1 SEL, then (1.2, Discussion #143) 2 CH5-8, 3 CH9-12, 4 CH13-16, (1.5.5, #202) 5 TRACK */
@@ -75,6 +84,45 @@ static uint32_t trk_midi_ch(uint32_t i)
     if (b == -2)
         return mch_get(i) < 16u ? mch_get(i) : i % NTRK;
     return (b > 0 ? (uint32_t)b : 0u) + i % NTRK;
+}
+
+/* 1.8: the sequencer's and RudiSeq's notes go to MIDI OUT too (USB, the track's channel as the keys': trk_midi_ch),
+ * so a pattern or a rudiment drives external gear as the keys already did. Steps, RATCH repeats, slides, the
+ * cursor's STEP PREVIEW and every release (gate, REST, STOP) pass through here: every note-on has its note-off.
+ * MIDI IN notes do not (input_on): they would only echo back to their sender. With no host or a full ring
+ * midi_out_event drops the packet (bsp usb.c midi_out_try) and the voice plays regardless */
+static void seq_note_on(track_t *t, uint32_t note, uint32_t vel)
+{
+    trk_note_on(t, note, vel);
+    midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | (note & 127u) << 16 | (vel & 127u) << 24);
+}
+static void seq_midi_off(track_t *t, uint32_t note)   /* MIDI OUT alone: a note whose voice ended otherwise */
+{
+    midi_out_event(0x08u | (0x80u | trk_midi_ch(trk_index(t))) << 8 | (note & 127u) << 16);
+}
+static void seq_note_off(track_t *t, uint32_t note)
+{
+    trk_note_off(t, note);
+    seq_midi_off(t, note);
+}
+/* the sequencer's sounding notes end on MIDI OUT when their voices end without seq_release (trk_all_off: a MIDI IN
+ * overflow, All Sound Off from MIDI IN) so none hangs on external gear; the caller clears seq_n */
+static void seq_midi_release(track_t *t)
+{
+    uint32_t i;
+    for (i = 0; i < t->seq_n; i++)
+        seq_midi_off(t, t->seq_notes[i]);
+}
+
+/* 1.8: SYNC (HOME > CLOCK's fourth knob, G_SYNC, OFF by default) ON with CLK INT: MIDI clock (24 a quarter,
+ * click_tick), Start (seq_start) and Stop (seq_stop) go to MIDI OUT, so external gear follows PLAY. Never with an
+ * external clock (CLK USB / TRS): the box follows then, and a clock sent back would loop. A realtime packet is
+ * USB-MIDI CIN 0xF with the status alone */
+static int sync_out(void) { return song.g[G_SYNC] && !song.g[G_CLOCK]; }
+static void sync_send(uint32_t status)
+{
+    if (sync_out())
+        midi_out_event(0x0Fu | status << 8);
 }
 
 static int drum_track(const track_t *t) { return ENGINES[eng_idx(t->eng_req)] == &ENG_DRUM; }
@@ -264,6 +312,12 @@ static __attribute__((noinline)) uint32_t midi_seq_preview(const track_t *t, uin
 
 static void arp_forget(track_t *t)               /* (its notes ended otherwise: trk_all_off) */
 {
+    uint32_t i;
+    if (t->arp_note)                                /* 1.8: on MIDI OUT they end here (a preset change, All Notes Off) */
+        seq_midi_off(t, t->arp_note);
+    for (i = 0; i < 3u; i++)
+        if (t->arp_ch[i])
+            seq_midi_off(t, t->arp_ch[i]);
     t->arp_note = t->arp_ch[0] = t->arp_ch[1] = t->arp_ch[2] = 0;
 }
 
@@ -276,7 +330,7 @@ static __attribute__((noinline)) void arp_chord_off(track_t *t, int rec)   /* th
         if (t->arp_ch[i]) {
             if (rec)
                 rec_release(t, t->arp_ch[i]);
-            trk_note_off(t, t->arp_ch[i]);
+            seq_note_off(t, t->arp_ch[i]);         /* (1.8: the voice and MIDI OUT) */
             t->arp_ch[i] = 0;
         }
 }
@@ -296,7 +350,7 @@ static __attribute__((noinline)) void arp_chord(track_t *t, const uint32_t *list
             t->arp_ch[i - 1u] = (uint8_t)nt;
         if (rec_on(t))
             rec_note(t, nt, 100);
-        trk_note_on(t, nt, 100);
+        seq_note_on(t, nt, 100);                /* (1.8: the voice and MIDI OUT) */
     }
 }
 
@@ -305,6 +359,8 @@ static void arp_silence(track_t *t)              /* the sounding arp note(s) end
     if (t->arp_ch[0] | t->arp_ch[1] | t->arp_ch[2])
         arp_chord_off(t, 0);
     trk_note_off(t, t->arp_note);
+    if (t->arp_note)                                /* (1.8: on MIDI OUT too; 0 is no note) */
+        seq_midi_off(t, t->arp_note);
     t->arp_note = 0;
 }
 
@@ -313,6 +369,8 @@ static void arp_off(track_t *t)                  /* the sounding arp note(s) end
     if (t->arp_ch[0] | t->arp_ch[1] | t->arp_ch[2])
         arp_chord_off(t, rec_on(t));
     trk_note_off(t, t->arp_note);
+    if (t->arp_note)                                /* (1.8: on MIDI OUT too; 0 is no note) */
+        seq_midi_off(t, t->arp_note);
     if (rec_on(t))
         rec_release(t, t->arp_note);
     t->arp_note = 0;
@@ -451,7 +509,7 @@ static __attribute__((noinline)) void arp_fire(track_t *t, uint32_t period)
         t->arp_note = (uint8_t)list[j];
         if (rec_on(t))
             rec_note(t, t->arp_note, 100);           /* recording: what the arp plays */
-        trk_note_on(t, t->arp_note, 100);
+        seq_note_on(t, t->arp_note, 100);            /* 1.8: and MIDI OUT: what sounds goes out, not the held keys */
     }
 }
 
@@ -761,13 +819,16 @@ static void key_on(uint32_t k, track_t *t)
 {
     uint32_t n = chord_build(t, kb_note[k], kb_chord[k]), i, mc = trk_midi_ch(trk_index(t)), vel = kb_vel;
     kb_chn[k] = 0;
+    kb_mo[k] = (uint8_t)!t->p[P_AMODE];             /* 1.8: ARP on, the arp's notes go to MIDI OUT (arp_fire), not the
+                                                     * keys it holds; key_off ends exactly what key_on sent */
     in_key = (uint8_t)(k + 1u);                     /* (the arp keeps the key: arp_add) */
     for (i = 0; i < n; i++) {
         uint32_t x = kb_chord[k][i];
         if (midi_local_held(t, x))
             continue;
         input_on(t, x, vel);
-        midi_out_event(0x09u | (0x90u | mc) << 8 | x << 16 | vel << 24);
+        if (kb_mo[k])
+            midi_out_event(0x09u | (0x90u | mc) << 8 | x << 16 | vel << 24);
     }
     in_key = 0;
     kb_chn[k] = (uint8_t)n;
@@ -784,7 +845,8 @@ static void key_off(uint32_t k, track_t *t)
         if (midi_local_held(t, x))
             continue;
         input_off(t, x);
-        midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
+        if (kb_mo[k])
+            midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
     }
 }
 
@@ -897,6 +959,7 @@ static void seq_start(void)
     midi_grid_reset();
     motion_begin();
     chain_start();
+    rudi_restart();
     for (i = 0; i < NTRK; i++) {                   /* every track from its step 0, together */
         track_t *t = &trk[i];
         t->seq_idx = (uint16_t)(t->p[P_SLEN] - 1);
@@ -913,6 +976,7 @@ static void seq_start(void)
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
     clk_pos = CLK_START;                           /* the metronome's first beat with step 0 */
     song.playing = 1;
+    sync_send(0xFAu);                              /* SYNC: Start, before step 0's first clock pulse (click_tick) */
     slicer_start();                                /* slicer.c: its step 0 with the sequencer's */
     perf_start();                                  /* perform.c: its 1/16 grid too */
 }
@@ -921,7 +985,7 @@ static void seq_release(track_t *t)
 {
     uint32_t i;
     for (i = 0; i < t->seq_n; i++)
-        trk_note_off(t, t->seq_notes[i]);
+        seq_note_off(t, t->seq_notes[i]);
     t->seq_n = 0;
     t->seq_hold = 0;
     t->slide_glide = 0;                             /* live MONO / LEG keys must not glide after it */
@@ -930,6 +994,8 @@ static void seq_release(track_t *t)
 static void seq_stop(void)
 {
     uint32_t i;
+    if (song.playing)
+        sync_send(0xFCu);                          /* SYNC: followers stop with the transport (not when stopped already) */
     song.playing = 0;
     cin_left = 0;                                  /* (a count-in: cancelled, nothing recorded) */
     cin_flush = 0;
@@ -940,6 +1006,7 @@ static void seq_stop(void)
                 arp_off(&trk[i]);
     for (i = 0; i < NTRK; i++) {
         seq_release(&trk[i]);
+        rudi_hush(&trk[i]);                        /* a rudi-mode note held over the stop */
         trk[i].rh_n = 0;                           /* a recorded note held over the stop: as far as it got */
         trk[i].rat_left = 0;
         trk[i].nd_late = trk[i].nd_early = ND_NONE;   /* (a nudged step not played yet: not after the stop) */
@@ -1053,13 +1120,13 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
         seq_release(t);
     for (i = 0; i < m; i++)
         if (!((sk >> i) & 1u))
-            trk_note_on(t, nn[i], vv[i]);
+            seq_note_on(t, nn[i], vv[i]);
     if (slide_in)                                   /* release what is not held over */
         for (i = 0; i < t->seq_n; i++) {
             for (j = 0; j < m && nn[j] != t->seq_notes[i]; j++)
                 ;
             if (j == m)
-                trk_note_off(t, t->seq_notes[i]);
+                seq_note_off(t, t->seq_notes[i]);
         }
     t->seq_n = 0;
     for (i = 0; i < m; i++)
@@ -1255,7 +1322,9 @@ static void seq_tick(track_t *t, uint32_t n)
         t->seq_pos = top ? (chain.running ? chain.carry : 0u) : t->seq_pos - cur_len;
         t->seq_idx = (uint16_t)((t->seq_idx + 1u) % len);
         seq_enter(t, top, len);
-        if (t->p[P_SQNT] && !t->nd_fired)
+        if (t->p[P_RUDION])
+            rudi_step(t);                           /* rudi mode: the rudiment's next hit, not the pattern's step */
+        else if (t->p[P_SQNT] && !t->nd_fired)
             seq_play_on(t, period);                 /* QUANTIZE ON: every step on its start, as before 1.2 */
         else
             seq_nd_start(t, period, len);
@@ -1340,22 +1409,30 @@ static __attribute__((noinline)) void cin_record(void)
 static void click_tick(uint32_t adv)
 {
     if (song.g[G_CLOCK]) adv = midi_grid_advance(&midi_click_grid, adv, 2u);
-    uint32_t p = div_samples(2), beat = 0;
+    uint32_t p = div_samples(2), beat = 0, pulses = 0, before = 0;
     if (clk_pos == CLK_START) {
         clk_pos = 0;
         clk_step = 0;
         beat = 2;
+        pulses = 1;                                 /* MIDI clock: the step's pulse 0 with step 0 */
     } else {
+        before = clk_pos * 6u / p;                  /* MIDI clock, 24 a quarter = 6 a 1/16 step: pulses 1..5 of the
+                                                     * step passed so far (pulse 0 is the step's start) */
         clk_pos += adv;
         while (clk_pos >= p) {                      /* (as seq_tick: the remainder kept) */
             clk_pos -= p;
             clk_step = (clk_step + 1u) & 15u;
             if (!(clk_step & 3u))
                 beat = clk_step ? 1u : 2u;
+            pulses += 6u - before;                  /* the step's remaining pulses and the next step's pulse 0 */
+            before = 0;
         }
+        pulses += clk_pos * 6u / p - before;
     }
     if (beat && click_wanted())
         click_req = (uint8_t)beat;
+    while (pulses--)                                /* (sync_send: nothing unless SYNC ON with CLK INT) */
+        sync_send(0xF8u);
 }
 /* the beat of the bar the click is on (0..3: 0 the accented first), -1 stopped: the count-in's, else the playing
  * transport's (clk_step, internal or external clock). It moves in the block a beat clicks in (the header's metronome,
@@ -1418,6 +1495,7 @@ static void events_block(uint32_t n)
         midi_hint = 0;
         for (i = 0; i < NTRK; i++) {
             trk[i].rh_n = trk[i].rskip_n = 0;
+            seq_midi_release(&trk[i]);                 /* (1.8: on MIDI OUT they end; the voices: trk_all_off below) */
             trk[i].seq_n = trk[i].seq_hold = trk[i].slide_glide = trk[i].rat_left = 0;
         }
         pr |= (1u << NTRK) - 1u;

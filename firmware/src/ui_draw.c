@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Felucca UI drawing: the header, the four knob cards, the footer (steps + engine / preset / page)
  * and the frame; the panel between the cards and the footer is ui_graph.c. The layout:
  * flat SURF cards and panels on BG,
@@ -1349,40 +1350,53 @@ static void draw_columns(void)
 }
 
 
-/* The power-on splash (main.c fm1_main, platforms/host/felucca_host.c; 1.1.5): a RAISE square centred on the screen, square
- * corners (in every style; LINE too: RAISE from the palette's SURF), in it in AF_M, the ink SPL_PAD in from the left:
- * at the top the name and the version, the first line's capitals' top SPL_PAD down; at the bottom the maker and
- * "with community", the last line's capitals' bottom (its baseline) SPL_PAD up from the square's bottom. Both
- * margins are measured to the capitals (the descender of "community" hangs into the bottom one, as off a baseline).
- * The square (176 x 176) is more than the canvas (CV_MAX, 240 x 124): it is filled straight on the screen and its
- * two text bands drawn on it as canvases, the top one from the square's top edge, the bottom one to its bottom edge.
- * In the saved palette (settings_init before it) */
-#define SPL_SQ 176                                  /* the square (even: centred exactly) */
-#define SPL_X0 ((240u - SPL_SQ) / 2u)               /* its top-left on the screen (x and y) */
-#define SPL_PAD 16                                  /* the text's inset: left (its ink), top and bottom (the capitals) */
-#define SPL_PITCH 20                                /* line to line */
-static const char *const SPLASH_LINES[] = {"Felucca", FELUCCA_VERSION, "H\xFCgelton Instruments", "with community"};
-/* a band of two lines, h tall, at y on the screen: the first line's top at ly; the two lines' capitals declared
- * against al0..al1 (mode: AL_V the band centred there, AL_B the last baseline on al1) */
-static void splash_band(uint32_t y, uint32_t h, int32_t ly, const char *const *l, uint32_t mode, int32_t al0,
-                        int32_t al1, const char *tag)
-{
-    cv_begin(SPL_SQ, h, T_RAISE);
-    GFX_HOOK_ALIGN(0, al0, 0, al1, mode | AL_N(2), tag);
-    cv_text_on(SPL_PAD, ly, &AF_M, l[0], T_TEXT, T_RAISE);
-    cv_text_on(SPL_PAD, ly + SPL_PITCH, &AF_M, l[1], T_TEXT, T_RAISE);
-    cv_blit(SPL_X0, y);
-}
+/* The power-on splash (main.c fm1_main, platforms/host/felucca_host.c; RudimentSeq r0.1): in the web app's colours
+ * (rudimentseq.com: background #080b0e, text #e8f0f8, the right hand #ff6b35, the left hand #00e5ff, the accent
+ * #ffd23f), not the saved palette. Top band (a canvas, the whole CV_MAX: 240 x 124 from the screen's top): a
+ * paradiddle, R L R R L R L L, as eight tiles in the hands' colours with the hand's letter in them, centred; the name
+ * under it in AF_L (the large face has its lower case, tools/gen_aa_font.py L_CHARS), centred by its ink; the version under that in the
+ * accent. Bottom band (240 x SPL_B_H, its bottom on the screen's): the upstream and its maker, dim. Shown
+ * RUDISEQ_SPLASH_MS (main.c); a key or button after RUDISEQ_SPLASH_SKIP_MS ends it. */
+#define SPL_BG RGB(8, 11, 14)
+#define SPL_TEXT RGB(232, 240, 248)
+#define SPL_DIM RGB(128, 144, 160)
+#define SPL_R RGB(255, 107, 53)
+#define SPL_L RGB(0, 229, 255)
+#define SPL_ACC RGB(255, 210, 63)
+#define SPL_NT 8                                    /* the tiles: a paradiddle */
+#define SPL_TILE 22                                 /* a tile's side */
+#define SPL_GAP 6                                   /* tile to tile */
+#define SPL_ROW_W (SPL_NT * SPL_TILE + (SPL_NT - 1) * SPL_GAP)   /* 218 */
+#define SPL_ROW_X ((240 - SPL_ROW_W) / 2)           /* 11: the row centred */
+#define SPL_ROW_Y 20                                /* the tiles' top */
+#define SPL_NAME_Y 56                               /* the name's line top (AF_L: its capitals rows 7 .. 27 of it) */
+#define SPL_VER_Y 96                                /* the version's line top (AF_M; the band ends at 123) */
+#define SPL_B_H 80                                  /* the bottom band */
+#define SPL_B_Y (240 - SPL_B_H)
+#define SPL_PITCH 20                                /* line to line (AF_M) */
+static const char SPLASH_HANDS[SPL_NT + 1] = "RLRRLRLL";
+static const char *const SPLASH_HAND_S[2] = {"R", "L"};
+static const char *const SPLASH_LINES[] = {RUDISEQ_NAME, RUDISEQ_VERSION, "on Felucca " FELUCCA_VERSION,
+                                           "H\xFCgelton Instruments"};
 static void draw_splash(void)
 {
-    int32_t h = SPL_PAD - AF_M_CAP_Y + SPL_PITCH + AF_M.h;     /* a band: its two lines, the descenders in */
-    int32_t lb = h - SPL_PAD - AF_M_CAP_H - AF_M_CAP_Y;         /* the bottom band's last line: its top */
-    lcd_fill(0, 0, 240, 240, T_BG);
-    lcd_fill(SPL_X0, SPL_X0, SPL_SQ, SPL_SQ, T_RAISE);
-    splash_band(SPL_X0, (uint32_t)h, SPL_PAD - AF_M_CAP_Y, SPLASH_LINES, AL_V, SPL_PAD,
-                SPL_PAD + SPL_PITCH + AF_M_CAP_H, "splash name + version SPL_PAD from the top");
-    splash_band(SPL_X0 + SPL_SQ - (uint32_t)h, (uint32_t)h, lb - SPL_PITCH, SPLASH_LINES + 2, AL_B, 0, h - SPL_PAD,
-                "splash maker's baseline SPL_PAD from the bottom");
+    uint32_t i;
+    lcd_fill(0, 0, 240, 240, SPL_BG);
+    cv_begin(240, CV_MAX / 240u, SPL_BG);                                 /* the top band: the rudiment, the name */
+    for (i = 0; i < SPL_NT; i++) {
+        uint32_t l = SPLASH_HANDS[i] == 'L';
+        int32_t x = SPL_ROW_X + (int32_t)i * (SPL_TILE + SPL_GAP);
+        uint16_t c = l ? SPL_L : SPL_R;
+        cv_rect(x, SPL_ROW_Y, SPL_TILE, SPL_TILE, c);
+        cv_text_in(x, SPL_ROW_Y + CAP_IN(M, SPL_TILE), SPL_TILE, &AF_M, SPLASH_HAND_S[l], SPL_BG, c);
+    }
+    cv_text_in(0, SPL_NAME_Y, 240, &AF_L, SPLASH_LINES[0], SPL_TEXT, SPL_BG);
+    cv_text_in(0, SPL_VER_Y, 240, &AF_M, SPLASH_LINES[1], SPL_ACC, SPL_BG);
+    cv_blit(0, 0);
+    cv_begin(240, SPL_B_H, SPL_BG);                                       /* the bottom band: the upstream, its maker */
+    cv_text_in(0, SPL_B_H - 2 * SPL_PITCH - AF_M.h + 4, 240, &AF_M, SPLASH_LINES[2], SPL_DIM, SPL_BG);
+    cv_text_in(0, SPL_B_H - SPL_PITCH - AF_M.h + 4, 240, &AF_M, SPLASH_LINES[3], SPL_DIM, SPL_BG);
+    cv_blit(0, SPL_B_Y);
     lcd_sync();
 }
 

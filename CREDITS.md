@@ -1,5 +1,9 @@
 # Credits
 
+This tree is RudimentSeq, a modified Felucca: the rudiment layer and the other changes are listed in
+[CHANGES-RUDIMENTSEQ.md](CHANGES-RUDIMENTSEQ.md), Copyright (C) 2026 RudimentSeq (rudimentseq.com), GPL-3.0-only.
+Everything below is Felucca's, unchanged.
+
 Felucca is Leo Kuroshita's ([@kurogedelic](https://github.com/kurogedelic), [Hügelton Instruments](https://hugelton.com)). It uses and
 thanks the work below; each keeps its own licence (see [LICENSE](LICENSE), [LICENSING.md](LICENSING.md) and [LICENSES/](LICENSES/)).
 

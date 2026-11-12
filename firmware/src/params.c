@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Parameter descriptors, formatting and the page table. */
 static const char *const N_LWAVE[] = {"SIN", "TRI", "SAW", "SQR", "S&H"};
 /* LFO 2 (1.2, #154). SYNC: OFF (RATE), or one cycle per note value of the tempo, longest first (LSYNC_DIV: its N_DIV);
@@ -177,6 +178,16 @@ static const param_desc_t TP[P_COUNT] = {
     [P_ATSNS] = PE("AT", N_ATSNS, 0),
     [P_ATDST] = PE("ATDST", N_MDST, 0),
     [P_ATAMT] = PD("ATAMT", F_BIPCT, -64, 63, 0),
+    /* RudiSeq (rudi.c): ON = the track plays RUDMT's rudiment instead of its pattern. The rudiment's
+     * name, sticking and playhead are the RUDI pages' graph (ui_graph.c GR_RUDI) */
+    [P_RUDION] = PE("RUDI", N_ONOFF, 0),   /* default OFF (a fresh track plays its pattern); once ON it survives sound changes (param_kept) */
+    [P_RUDI] = PD("RUDMT", F_INT, 0, NUM_RUDIMENTS - 1, 15),   /* 15: Single Paradiddle */
+    [P_RUDPR] = PD("PRB R", F_PCT, 0, 100, 100),
+    [P_RUDPL] = PD("PRB L", F_PCT, 0, 100, 100),
+    [P_RUDSMA] = PE("SMART", N_ONOFF, 0),
+    [P_RUDFEA] = PD("FTHR", F_PCT, 0, 100, 0),
+    [P_RUDNR] = PD("NTE R", F_INT, 0, 127, 38),   /* DRUM: snare */
+    [P_RUDNL] = PD("NTE L", F_INT, 0, 127, 37),   /* DRUM: rim */
 };
 
 /* the INSERT's A B C as its TYPE means them (TP's ranges and defaults): the drives DRIVE TONE LEVEL, CRUSH BITS RATE
@@ -208,11 +219,13 @@ static const param_desc_t GP[G_COUNT] = {
     [G_RDAMP] = PD("DAMP", F_PCT, 0, 127, 60),
     [G_CRATE] = PD("CRT", F_LFOHZ, 0, 127, 40),
     [G_CDEPTH] = PD("CDP", F_PCT, 0, 127, 60),
-    /* G_MIDI, G_SYNC, G_INFO: the old SYSTEM page's (gone in 1.2), on no page: MIDI's value was never read (its card
-     * showed the USB state), SYNC was a placeholder, CPU a reading; the USB state and the CPU load are MENU > SYSTEM >
-     * INFO's now (ui_menu.c). Kept: the ids and G_COUNT are fixed by the formats and the protocol */
+    /* G_MIDI, G_INFO: the old SYSTEM page's (gone in 1.2), on no page: MIDI's value was never read (its card showed
+     * the USB state), CPU a reading; the USB state and the CPU load are MENU > SYSTEM > INFO's now (ui_menu.c). Kept:
+     * the ids and G_COUNT are fixed by the formats and the protocol. G_SYNC was that page's placeholder ("--", stored
+     * 0); 1.8 gives it its meaning: SYNC OFF / ON on HOME > CLOCK's fourth knob, next to CLK (the clock in): ON with
+     * CLK INT, MIDI clock, Start and Stop go to MIDI OUT (seq.c sync_send). Every older project stores 0 = OFF */
     [G_MIDI] = PE("MIDI", N_MIDI_INPUT, 0),
-    [G_SYNC] = PE("SYNC", N_DASH, 0),
+    [G_SYNC] = PE("SYNC", N_ONOFF, 0),
     /* MIDI IN's routing, edited on MENU > MIDI > MIDI IN (1.2: menu_items.c MI_MIDIIN; up to 1.1.5 GLO > SYSTEM ROUT),
      * stored with the project as before. (was "--": stored 0 = CH1-4, as MIDI IN always was) */
     [G_ROUTE] = PE("ROUT", N_ROUTE, 0),
@@ -336,6 +349,11 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
 {
     *unit = "";
     fmt_named = d->fmt == F_ENUM;
+    if (d == &TP[P_RUDI]) {                         /* RudiSeq: the rudiment's short name, not its index */
+        str_cpy(val, RUDIMENTS[(uint32_t)v % NUM_RUDIMENTS].sname, 10);
+        fmt_named = 1;
+        return;
+    }
     switch (d->fmt) {
     case F_PCT:                                     /* a 0..100 range (SWG) is its value, others a share of 127 */
         fmt_int(val, d->max == 100 ? v : (v * 100 + 63) / 127);
@@ -446,7 +464,8 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_FX, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE,
 enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACKS page (ui_input.c tracks_edit) */
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
-       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS };   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
+       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS,     /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
+     GR_RUDI };                               /* RudiSeq: the rudiment's name and sticking (ui_graph.c) */
 
 typedef struct {
     const char *title;
@@ -501,6 +520,12 @@ static const page_t PAGES[] = {
     {"ARP", FAM_ARP, SC_TRACK, GR_ARP, {P_AMODE, P_ARATE, P_AOCT, P_AGATE}},
     {"ARP 2", FAM_ARP, SC_TRACK, GR_NONE, {P_ASWING, P_APROB, P_AHOLD, P_AORDER}},
     {"STEP", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},
+    {"RUDI", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDION, P_RUDI, P_RUDNR, P_RUDNL}},    /* RudiSeq (1.8): one tap from STEP —
+                                                                             * the track plays a rudiment, not its pattern.
+                                                                             * K3-4 are the hands' NOTES here (the two pitches
+                                                                             * a bass or melody line wants first); the hand
+                                                                             * probabilities moved to RUDI 2 */
+    {"RUDI 2", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDSMA, P_RUDFEA, P_RUDPR, P_RUDPL}},
     {"DETAIL", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},   /* 1.5.1 (#199): the cursor step's CHANCE RATCH NUDGE VEL
                                                              * (ui.c detail_on, ui_input.c sd_turn) */
     {"AUTOMATION", FAM_SEQ, SC_TRACK, GR_EVENTS, {0xFF, 0xFF, 0xFF, 0xFF}},  /* the locks, events, CHANCE and RATCH as a
@@ -508,7 +533,7 @@ static const page_t PAGES[] = {
     /* HOME's pages (1.2): HOME tapped on HOME the MIXER (up to 1.1.5 GLO's; LEVEL PAN REV MUTE), again CLOCK (up to 1.1.5
      * GLO > GLOBAL; its TUNE is MENU > AUDIO's now), again HOME (ui.c home_tap) */
     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},
-    {"CLOCK", FAM_TRK, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_CLOCK, 0xFF}},
+    {"CLOCK", FAM_TRK, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_CLOCK, G_SYNC}},   /* 1.8: SYNC, MIDI clock out, by CLK */
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */

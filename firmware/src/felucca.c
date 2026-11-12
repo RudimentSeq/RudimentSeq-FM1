@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* FELUCCA: one compilation unit (the HAL is header-only). Each file uses what the files above it
  * define, so the order matters. */
 
@@ -54,6 +55,7 @@
 #ifndef FELUCCA_VERSION
 #define FELUCCA_VERSION "v1.9.0" /* shown in the menu, the console and the editor; build.py --release X.Y */
 #endif
+/* RudimentSeq identity (RUDISEQ_NAME, _VERSION, _AUTHOR, _URL): core.h, so the host tests see it too */
 #if FELUCCA_OTA && !FELUCCA_FLASH
 #error "FELUCCA_OTA needs FELUCCA_FLASH"
 #endif

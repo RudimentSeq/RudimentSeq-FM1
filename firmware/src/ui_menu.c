@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Felucca menu (HOME held): its rows in tabs (1.0.5: DISPLAY CONTROL AUDIO SYSTEM; 1.2: MIDI before SYSTEM; ALGORITHM
  * between them, PRESETS within one; no scrolling), the rows in menu_items.c (the settings, shared with the editor's
  * MENU_DESC / MENU_SET; 1.2: TUNE and MIDI IN, the project's). No BACK row: HOME closes it (ui_input.c). The two-valued
@@ -36,6 +37,10 @@ static void draw_about_qr(int32_t x, int32_t y)
 enum { MC_TEXT, MC_TITLE, MC_URL };
 typedef struct { const char *text; uint8_t kind; } menu_credit_t;
 static const menu_credit_t MENU_CREDITS[] = {
+    {"RudimentSeq", MC_TITLE},              /* this fork: the rudiment sequencer layer (rudi.c), GPL-3.0 */
+    {"Rudiments by " RUDISEQ_AUTHOR, MC_TEXT},
+    {"https://" RUDISEQ_URL, MC_URL},
+    {"", MC_TEXT},
     {"H\xFCgelton Instruments", MC_TITLE},  /* Felucca's own: above; these are ours too */
     {"Leo Kuroshita", MC_TEXT},
     {"The DRUM engine: GPL-3.0", MC_TEXT},
@@ -122,9 +127,9 @@ static int32_t menu_document(int32_t y, int draw)
 {
     uint32_t i;
     if (draw) {
-        cv_text(6, y + 2, &AF_L, "FELUCCA", T_THEME);
-        cv_text(6, y + 38, &AF_S, "Multi-engine synthesizer", T_TEXT);
-        cv_text(6, y + 58, &AF_M, FELUCCA_VERSION, T_THEME);
+        cv_text(6, y + 2, &AF_L, RUDISEQ_NAME_CAPS, T_THEME);
+        cv_text(6, y + 38, &AF_S, "Rudiment groovebox on Felucca", T_TEXT);
+        cv_text(6, y + 58, &AF_M, RUDISEQ_VERSION " on " FELUCCA_VERSION, T_THEME);
         cv_text_r(232, y + 61, &AF_S, __DATE__, T_MID, T_BG);
         cv_text(6, y + 82, &AF_S, "(C) 2026 Leo Kuroshita", T_TEXT);
         cv_text(6, y + 100, &AF_S, "H\xFCgelton Instruments", T_TEXT);
@@ -145,10 +150,11 @@ static int32_t menu_document(int32_t y, int draw)
         else y = menu_text(text, y, c->kind == MC_TITLE ? T_THEME : c->kind == MC_URL ? T_MID : T_TEXT, draw);
     }
     y = menu_text("LICENSES + SOURCE", y + 12, T_THEME, draw);
-    y = menu_text("Felucca: GPL-3.0-only; Felucca-Engines MIT; felucca-bsp MPL-2.0; the Sample Pack CC0", y, T_TEXT, draw);
+    y = menu_text("RudimentSeq: GPL-3.0-only, a modified Felucca (2026). Felucca: GPL-3.0-only; Felucca-Engines MIT; felucca-bsp MPL-2.0; the Sample Pack CC0", y, T_TEXT, draw);
     y = menu_text("Fonts and icons: their licences travel with the source and the release files.", y, T_TEXT, draw);
     y = menu_text("NO WARRANTY", y, T_TEXT, draw);
     y = menu_text("Full notices in source:", y + 8, T_TEXT, draw);
+    y = menu_text(RUDISEQ_URL, y, T_MID, draw);
     y = menu_text("github.com/hugelton/Felucca", y, T_MID, draw);
     return y + 4;
 }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* 1.2's stored-format changes (FUN10), on the real sound, sequencer, project, user preset and UI sources (with the
  * stubs of tests/ui_test.c):
  *   LFO 2      SYNC: one cycle per note value of the tempo (several values and tempi, the external clock's measured
@@ -490,37 +491,67 @@ static int formats(void)
     motion_set_lock(&trk[2], 9, P_E0 + 3, 7);
     project_capture(&a);
     ok = motion.count == MOTION_MAX && proj_pack(&st, &a) && ((uint32_t *)st.raw)[0] == 0x46554E41u &&
-         ((uint32_t *)st.raw)[1] == 3840u && st.raw[66] == P_COUNT && proj_import(&b, &st, sizeof st) && !memcmp(&a, &b, sizeof a);
+         ((uint32_t *)st.raw)[1] == 3840u && st.raw[66] == PROJ_NP_SAVE && proj_import(&b, &st, sizeof st) && !memcmp(&a, &b, sizeof a);
     ok &= step_nudge(&b.t[0].step[0]) == -8 && step_nudge(&b.t[0].step[1]) == 7 && step_nudge(&b.t[0].step[2]) == -1 &&
           step_ratchet(&b.t[0].step[3]) == 4u && step_nudge(&b.t[0].step[3]) == 1 && step_chance(&b.t[0].step[3]) == 33u;
     ok &= b.t[0].p[P_LSYNC] == 8 && b.t[0].p[P_LTRIG] == 1 && b.t[0].p[P_LPOL] == 1 && b.t[0].p[P_SQNT] == 0;
-    ok &= !(st.raw[68u + P_COUNT + 2u] & 0x80u) && (st.raw[68u + P_COUNT + 2u + 3u] & 0x80u) &&   /* -8: bit 3 only */
-          (st.raw[68u + P_COUNT + 2u + 9u] & 0x80u) && !(st.raw[68u + P_COUNT + 2u + 12u] & 0x80u);   /* +7: bits 0..2 */
+    ok &= !(st.raw[68u + PROJ_NP_SAVE + 2u] & 0x80u) && (st.raw[68u + PROJ_NP_SAVE + 2u + 3u] & 0x80u) &&   /* -8: bit 3 only */
+          (st.raw[68u + PROJ_NP_SAVE + 2u + 9u] & 0x80u) && !(st.raw[68u + PROJ_NP_SAVE + 2u + 12u] & 0x80u);   /* +7: bits 0..2 */
     bad += check("FUN10 round trip: 3840 bytes, nudges (bit 7 of the note bytes), 128 records, LFO 2, QUANTIZE", ok);
+    {   /* 1.8: the rudiment parameters are saved per project like every other parameter — P_RUDI at its top value
+         * too (NUM_RUDIMENTS - 1), which exercises the widened stored byte. The whole P_COUNT and the motion survive,
+         * an engine-value lock's id stored in place (the store is now full P_COUNT wide, no shift). */
+        project_t r, s;
+        project_capture(&r);
+        for (k = 0; k < NTRK; k++) {
+            r.t[k].p[P_RUDION] = 1; r.t[k].p[P_RUDI] = NUM_RUDIMENTS - 1; r.t[k].p[P_RUDPR] = 70;
+            r.t[k].p[P_RUDNR] = 50; r.t[k].p[P_RUDNL] = 51;
+        }
+        r.t[1].p[P_REV] = 40;                                           /* a non-rudi value that must survive */
+        memset(&r.motion, 0, sizeof r.motion);
+        r.motion.count = 2; r.motion.on = 8;
+        r.motion.event[0] = (motion_event_t){2u, P_REV, 20};                             /* a common automation: kept, id as is */
+        r.motion.event[1] = (motion_event_t){4u, (uint8_t)((P_E0 + 2) | MOTION_LOCK), 9}; /* a lock on an engine value: id in place */
+        r.sum = proj_sum(&r);
+        ok = proj_pack(&st, &r) && st.raw[66] == PROJ_NP_SAVE && PROJ_NP_SAVE == P_COUNT && proj_import(&s, &st, sizeof st);
+        for (k = 0; k < NTRK; k++)
+            ok &= s.t[k].p[P_RUDION] == 1 && s.t[k].p[P_RUDI] == NUM_RUDIMENTS - 1 &&
+                  s.t[k].p[P_RUDPR] == 70 && s.t[k].p[P_RUDNR] == 50 && s.t[k].p[P_RUDNL] == 51;
+        ok &= s.t[1].p[P_REV] == 40;                                    /* a non-rudi value survived the round trip */
+        ok &= s.motion.count == 2u &&                                   /* both records kept, the engine id in place */
+              s.motion.event[0].param == P_REV && s.motion.event[0].value == 20 &&
+              s.motion.event[1].param == (uint8_t)((P_E0 + 2) | MOTION_LOCK) && s.motion.event[1].value == 9;
+        bad += check("1.8: rudiments saved per project (P_RUDI at its max); the whole P_COUNT and motion survive", ok);
+    }
     /* a FUN10 of a 1.2 build before SPREAD (#148): 103 parameters (no P_SPRD, nor 1.5's); one of 1.2 .. 1.4: 104 (no
      * INSERT, filter TYPE, ENV SYNC: 1.5). Their engine values and their motion (the lock on E3) as many ids lower. They
      * load by count: SPREAD 0, the INSERT OFF (its defaults), TYPE LP, ENV SYNC OFF, the rest as written */
     for (uint32_t from = P_SPRD; from <= P_ITYPE; from += P_ITYPE - P_SPRD) {
         static project_store_t so;
-        uint32_t pi = 68u, po = 68u, tr, m0, drop = P_E0 - from;
+        uint32_t po = 68u, tr, m0, drop = P_E0 - from, sbase, schain;
         memset(&so, 0, sizeof so);
+        /* proj_pack already drops the 8 live rudi params (PROJ_NP_SAVE wide); here we build an even shorter, genuinely
+         * old FUN10 by dropping every param from `from` up to P_E0 (the rudi block among them), sourcing params from the
+         * project a, and the engine/preset/steps and chain (np-independent bytes) from that pack. */
         ok = proj_pack(&st, &a) && !a.t[0].p[P_SPRD] && !a.t[0].p[P_ITYPE] && !a.t[0].p[P_FTYPE] && !a.t[0].p[P_ESYNC];
         memcpy(so.raw, st.raw, 68u);
         so.raw[66] = (uint8_t)(P_COUNT - drop);
         for (tr = 0; tr < NTRK; tr++) {
-            for (i = 0; i < P_COUNT; i++, pi++)
+            sbase = 68u + tr * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + PROJ_NP_SAVE;   /* st: this track's engine/preset/steps */
+            for (i = 0; i < P_COUNT; i++)
                 if (i < from || i >= P_E0)
-                    so.raw[po++] = st.raw[pi];
-            memcpy(so.raw + po, st.raw + pi, 2u + NSTEP * 9u);
-            pi += 2u + NSTEP * 9u;
+                    so.raw[po++] = (uint8_t)(a.t[tr].p[i] + 64);                   /* params, [from..P_E0) dropped */
+            memcpy(so.raw + po, st.raw + sbase, 2u + NSTEP * 9u);                  /* engine, preset, steps */
             po += 2u + NSTEP * 9u;
         }
-        memcpy(so.raw + po, st.raw + pi, sizeof(chain_config_t) + sizeof(motion_store_t));
+        schain = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u);                    /* st: chain (np-independent) */
+        memcpy(so.raw + po, st.raw + schain, sizeof(chain_config_t));
         m0 = po + sizeof(chain_config_t);
+        memcpy(so.raw + m0, &a.motion, sizeof a.motion);                          /* motion from today's ids */
         for (i = 0; i < so.raw[m0]; i++) {
             uint8_t *id = &so.raw[m0 + 4u + 3u * i + 1u];
             if ((*id & 0x7Fu) >= P_E0)
-                *id = (uint8_t)(*id - drop);            /* (the lock bit kept) */
+                *id = (uint8_t)(*id - drop);            /* ids from P_E0 on -> this store's (the lock bit kept) */
         }
         memcpy(so.raw + PROJ_FM6_OFF, st.raw + PROJ_FM6_OFF, PROJ_STORE_SIZE - 4u - PROJ_FM6_OFF);
         i = proj_hash(so.raw, PROJ_STORE_SIZE - 4u);
@@ -536,7 +567,7 @@ static int formats(void)
     }
     {   /* the song's sections (1.2): a slot per track, "-" silent, 5 bytes a row, 84 in all, right after the steps */
         project_t c = a, d;
-        uint32_t at = 68u + NTRK * (P_COUNT + 2u + NSTEP * 9u);
+        uint32_t at = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u);
         c.chain.count = CHAIN_ROWS;
         for (i = 0; i < CHAIN_ROWS; i++)
             c.chain.row[i] = (chain_row_t){{(uint8_t)(i % 5u), (uint8_t)((i + 1u) % 5u), (uint8_t)((i + 2u) % 5u),
@@ -674,18 +705,18 @@ static int formats(void)
 static int midi_track_fmt(void)
 {
     int bad = 0, ok;
-    uint32_t i, end = 68u + NTRK * (P_COUNT + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t);
+    uint32_t i, end = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t);
     project_t a, b;
     static project_store_t st, old;
     int16_t r;
     memset(song.mch, 0, sizeof song.mch);
     song.g[G_ROUTE] = 0;
     project_capture(&a);
-    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 4u;
+    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 14u;
     for (i = end; i < PROJ_FM6_OFF; i++)
         ok &= st.raw[i] == 0u;
     ok &= proj_import(&b, &st, sizeof st) && !memcmp(&a, &b, sizeof a) && !b.mch[0] && !b.mch[3] && !b.g[G_ROUTE];
-    bad += check("MIDI IN TRACK (1.5.5): CH1-4 and the default channels pack as before (the 4 spare bytes all 0)", ok);
+    bad += check("MIDI IN TRACK (1.5.5): CH1-4 and the default channels pack as before (the 14 spare bytes all 0)", ok);
 
     song.g[G_ROUTE] = ROUTE_TRACK;
     mch_set(0, 9); mch_set(1, 1); mch_set(2, MCH_OMNI); mch_set(3, MCH_OFF);

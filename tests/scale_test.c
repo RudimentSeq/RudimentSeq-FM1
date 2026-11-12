@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
+/* Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Exercise the real keyboard, recording, arp and MIDI-out paths on the host.
  * Build with the same generated headers and flags as hostsim.c. */
 #include <assert.h>
@@ -101,9 +102,10 @@ static void key_events_test(void)
     keyboard_block();
     assert(t->arp_phys == 1 && t->nheld == 1 && t->held[0] == 63);
     assert(t->step[0].n == 0);             /* ARP on: the arp's notes are recorded, not the keys */
+    assert(mo_w == 0);                     /* 1.8: .. and go to MIDI OUT, not the keys: what sounds goes out */
     arp_tick(t, 1);
     assert(t->step[0].n == 1 && t->step[0].note[0] == 63);
-    assert(mo_w == 1 && ((midi_out_q[0] >> 16) & 127u) == 63);
+    assert(mo_w == 1 && ((midi_out_q[0] >> 16) & 127u) == 63 && ((midi_out_q[0] >> 8) & 0xF0u) == 0x90u);
     t->p[P_SCALE] = 9;
     t->p[P_ROOT] = 6;
     t->p[P_TRANS] = 12;
@@ -112,7 +114,9 @@ static void key_events_test(void)
     fm1_in.notes = 0;
     keyboard_block();
     assert(t->arp_phys == 0 && t->nheld == 0);
-    assert(mo_w == 2 && ((midi_out_q[1] >> 16) & 127u) == 63);
+    assert(mo_w == 1);                     /* the key never went out; the arp's note sounds to its step's end */
+    arp_tick(t, 1);                        /* nothing held: the arp lets its note go, on MIDI OUT too */
+    assert(!t->arp_note && mo_w == 2 && ((midi_out_q[1] >> 16) & 127u) == 63);
     assert(((midi_out_q[1] >> 8) & 255u) == 0x80u);
     song.sel = 0;
     t->p[P_QUANT] = 0;
@@ -123,8 +127,36 @@ static void key_events_test(void)
     t->p[P_QUANT] = 2;
     fm1_in.notes = 0;
     keyboard_block();
-    assert(t->arp_phys == 0 && t->nheld == 0 && mo_w == before + 1);
-    puts("scales: silent keys, arp, live recording, MIDI out and held-note changes ok");
+    assert(t->arp_phys == 0 && t->nheld == 0 && mo_w == before);   /* (ARP on: the key was never on MIDI OUT) */
+    /* 1.8: ARP switched on while a key it sent to MIDI OUT is held: key_off still ends it there (nothing hangs) */
+    t->p[P_AMODE] = 0;
+    fm1_in.notes = 1u << 11;               /* E, ARP off: the key goes out */
+    keyboard_block();
+    assert(mo_w == before + 1 && ((midi_out_q[(mo_w - 1u) % MQ] >> 8) & 0xF0u) == 0x90u);
+    t->p[P_AMODE] = 1;                     /* ARP on while it is held */
+    fm1_in.notes = 0;
+    keyboard_block();
+    assert(mo_w == before + 2 && ((midi_out_q[(mo_w - 1u) % MQ] >> 8) & 0xF0u) == 0x80u);
+    /* 1.8: a preset change while the arp sounds (trk_all_off, arp_forget): its note ends on MIDI OUT */
+    fm1_in.notes = 1u << 11;
+    keyboard_block();
+    arp_tick(t, 1);
+    assert(t->arp_note && mo_w == before + 3);
+    before = mo_w;
+    trk_all_off(t);
+    t->nheld = 0; t->arp_phys = 0;
+    arp_forget(t);
+    assert(!t->arp_note && mo_w == before + 1 && ((midi_out_q[(mo_w - 1u) % MQ] >> 8) & 0xF0u) == 0x80u);
+    fm1_in.notes = 0;
+    keyboard_block();
+    assert(mo_w == before + 1);            /* (the key: never on MIDI OUT) */
+    /* 1.8: All Sound Off from MIDI IN (midi_silence_track) ends the sequencer's notes on MIDI OUT too */
+    t->seq_notes[0] = 60; t->seq_n = 1;
+    before = mo_w;
+    midi_silence_track(0);
+    assert(!t->seq_n && mo_w == before + 1 && ((midi_out_q[(mo_w - 1u) % MQ] >> 16) & 127u) == 60 &&
+           ((midi_out_q[(mo_w - 1u) % MQ] >> 8) & 0xF0u) == 0x80u);
+    puts("scales: silent keys, arp, live recording, MIDI out (1.8: the arp's notes, not the keys; nothing hangs) and held-note changes ok");
 }
 
 /* the voices of t holding a note (gate on), and whether note n is one of them */

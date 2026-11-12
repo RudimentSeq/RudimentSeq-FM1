@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Adapted from MIDI control contribution by ChanceTheMaker (2026).
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Shared USB/TRS channel controls. Included by seq.c after its input helpers.
  * USB and TRS intentionally share channel state, matching the existing routing.
  * A synth part has one live bend/wheel state; channels assigned to the same part
@@ -186,7 +187,8 @@ static void midi_silence_track(uint32_t track)
     uint32_t i;
     trk_all_off(t);
     t->nheld = t->arp_phys = t->rh_n = 0;
-    arp_forget(t);
+    arp_forget(t);                                 /* (1.8: the arp's notes end on MIDI OUT) */
+    seq_midi_release(t);                           /* (1.8: the sequencer's too, before seq_n goes) */
     t->seq_n = t->seq_hold = t->slide_glide = 0;
     for (i = 0; i < NVOICE; i++)
         if (t->v[i].active)

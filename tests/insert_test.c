@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Host test of the per-track INSERT (1.5, Discussions #78 and #177; src/fx.c track_insert), on the real sources:
  *   build/host/insert_test [DEMO_DIR]      (run_tests.sh builds and runs it; demos in build/insert_demo/)
  * 1. bit for bit: TYPE OFF with any A B C MIX, and MIX 0 of every type, render the phrases the defaults render (POLY,
@@ -381,13 +382,13 @@ static void test_stored(void)
     motion_set_event(&trk[1], 3, P_IMIX, 77);
     motion_set_lock(&trk[2], 5, P_IA, 9);
     project_capture(&a);
-    ok = proj_pack(&st, &a) && st.raw[66] == P_COUNT && P_COUNT == 114u && proj_import(&b, &st, sizeof st) &&
+    ok = proj_pack(&st, &a) && st.raw[66] == PROJ_NP_SAVE && PROJ_NP_SAVE == 122u && proj_import(&b, &st, sizeof st) &&
          !memcmp(&a, &b, sizeof a);
     for (k = 0; k < NTRK; k++)
         ok &= b.t[k].p[P_ITYPE] == (int16_t)(k * 2u + 1u) && b.t[k].p[P_IMIX] == (int16_t)(100 + k) &&
               b.t[k].p[P_IC] == (int16_t)(30 + k);
-    ok &= 68u + NTRK * (P_COUNT + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t) + 4u == PROJ_FM6_OFF;
-    ck("project: FUN10 round trip of the INSERT (114 parameters since 1.8, its motion), 4 spare bytes before the patches", ok);
+    ok &= 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t) + 4u + 10u == PROJ_FM6_OFF;
+    ck("project: FUN10 round trip of the INSERT (122 parameters incl rudiments since 1.8, its motion), 10 spare bytes before the patches", ok);
     /* user presets: a record of 111 keeps them; one of 104 (1.2 .. 1.4) gets the INSERT OFF */
     memset(&r, 0, sizeof r);
     r.used = UP_USED; r.ver = UP_VER; r.engine = 0; r.np = P_COUNT;

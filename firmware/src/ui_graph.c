@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Felucca UI: the panel (Y_GRAPH .. Y_GRAPH + H_GRAPH) between the cards and the footer: a SURF area
  * (rounded, on BG) holding the page graphs (ADSR, LFO, steps, piano roll, drum grid, scale, FX, SLICER,
  * MOD, lists: presets, user presets, patterns, project slots, song), the HOME oscilloscope, the
@@ -382,6 +383,61 @@ static void graph_scale(const track_t *t, uint16_t c)
         uint16_t col = (mask >> deg) & 1u ? (deg == 0u ? T_ACCENT : c) : T_RAISE;
         cv_rrect(x + 3, BLACK[i] ? 6 : 38, 10, 52, 3, col, T_SURF);
     }
+}
+
+/* RudiSeq (rudi.c): the rudiment named, and its sticking as the app draws it:
+ * right hand up / left hand down from a baseline, accents taller, graces
+ * short, rests a dot, a tick under each beat; the hit playing in the accent
+ * colour. Off, the strip still previews what RUDMT would play. */
+static void graph_rudi(const track_t *t, uint16_t c)
+{
+    uint32_t rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
+    const rudiment_t *rd = &RUDIMENTS[rud];
+    uint32_t k = trk_index(t), n = rd->nHits, cols = n > 32u ? 32u : n, i, per;
+    uint32_t cur = 0xFFFFu;
+    int32_t w, bw, x0, x;
+    char b[24];
+    if (song.playing && t->p[P_RUDION])
+        cur = (rudi[k].hit + n - 1u) % n;            /* rudi_step already advanced past it */
+    if (t->p[P_RUDION]) {
+        b[0] = '#';
+        fmt_int(b + 1, rd->id);
+        x = cv_text(10, 2, &AF_S, b, T_MID);
+        cv_text(x + 6, 2, &AF_S, CATS[rd->cat % NUM_CATS], T_MID);
+    } else {
+        cv_text(10, 2, &AF_S, "RUDI OFF  [K1] PLAYS IT", T_MID);
+    }
+    fmt_int(b, (int32_t)n);
+    for (i = 0; b[i]; i++) ;
+    str_cpy(b + i, rd->triplet ? " HITS TRIP" : " HITS 16TH", 11);
+    cv_text_r(228, 2, &AF_S, b, T_MID, T_SURF);
+    cv_text(10, 16, &AF_M, rd->name, T_TEXT);
+
+    w = clamp(216 / (int32_t)cols, 4, 14);           /* the strip, centred */
+    bw = w > 5 ? w - 2 : w - 1;
+    x0 = 10 + (216 - w * (int32_t)cols) / 2;
+    per = rd->triplet ? 3u : 4u;
+    cv_rect(x0, 67, w * (int32_t)cols, 1, T_RAISE);  /* the baseline */
+    for (i = 0; i < cols; i++) {
+        const rudi_hit_t *h = &rd->hits[i];
+        int32_t ht;
+        uint16_t col;
+        x = x0 + (int32_t)i * w;
+        if (i % per == 0u)                           /* a beat starts under this hit */
+            cv_rect(x, 90, 1, 4, T_MID);
+        if (h->hand < 0) {                           /* a rest */
+            cv_rect(x + w / 2 - 1, 65, 2, 2, i == cur ? T_ACCENT : T_RAISE);
+            continue;
+        }
+        ht = h->grace ? 9 : h->accent ? 28 : 19;
+        col = i == cur ? T_ACCENT : h->hand ? T_TEXT : c;
+        if (h->hand)
+            cv_rect(x + 1, 69, bw, ht, col);         /* L: down */
+        else
+            cv_rect(x + 1, 67 - ht, bw, ht, col);    /* R: up */
+    }
+    if (n > cols)
+        cv_text_r(228, 76, &AF_S, "+", T_MID, T_SURF);
 }
 /* CHORD (SCL 2): the chord's name ("Cm7": the last one the track played; before any, the one on its ROOT from
  * C4) over the keys from the C below its lowest note (two octaves, three for a wide one): its notes THEME, its
@@ -1219,6 +1275,8 @@ static uint32_t graph_signature(void)
     }
     if (pg->graph == GR_MOD)
         h ^= (mod_ui_slot + 1u) * 40503u;
+    if (pg->graph == GR_RUDI)                        /* the playhead on the sticking strip */
+        h ^= (song.playing && t->p[P_RUDION] ? rudi[song.sel].hit + 1u : 0u) * 2654435761u;
     if (pg->graph == GR_SLCR && t->p[P_SLCR])        /* the SLICER's step playing */
         h ^= (sl[song.sel].idx + 1u) * 2654435761u;
     if (pg->graph == GR_SLOTS) {                     /* (a checksum over each slot) */
@@ -2284,6 +2342,9 @@ static void draw_graph(void)
             break;
         case GR_SCALE:
             graph_scale(t, c);
+            break;
+        case GR_RUDI:
+            graph_rudi(t, c);
             break;
         case GR_CHORD:
             cv_oy = 0;

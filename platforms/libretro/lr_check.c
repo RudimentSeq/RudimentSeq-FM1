@@ -163,7 +163,7 @@ int main(int argc, char **argv)
         printf("lr_check: %s\n", bad ? "FAILED" : "ok");
         return bad ? 1 : 0;
     }
-    run(120);                                       /* (past the splash) */
+    run(190);                                       /* (past the splash: 30 ms + RUDISEQ_SPLASH_MS) */
     sum = 0, frames = 0;
     run(30);
     rms_quiet = sqrt(sum / (2.0 * frames));

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Renders of the firmware UI (firmware/src/ui*.c on tests/ui_test.c's stubs), the layout lint, the GREY and MONO
  * checks and the host draw cost.
  *   ui_render OUTDIR [SLOTDIR]   (run by tests/run_tests.sh; tests/ui_render.py makes the PNGs;
@@ -653,6 +654,7 @@ static void mono_check(void)
 {
     uint32_t i, bw = settings.palette == UI_BW_INDEX;
     if (settings.palette != UI_GREY_INDEX && !bw) return;
+    if (strstr(cur_name, "splash")) return;          /* RudimentSeq: the splash ("<PALETTE>/splash") is in its own colours in every palette */
     for (i = 0; i < 240u * 240u; i++) {
         uint16_t c = swap16(host_screen[i]);
         int32_t d = (int32_t)((c >> 5) & 63u) - (int32_t)(c >> 11) * 2;
@@ -1673,33 +1675,29 @@ static void draw(int s)
     }
     if (s == S_SPLASH) {                          /* the power-on splash (main.c, before the UI): its lines, the version
                                                    * shown FELUCCA_VERSION (run_tests.sh: src/felucca.c's) */
-        static const char WANT[] = "Felucca|" FELUCCA_VERSION "|H\xFCgelton Instruments|with community";
+        static const char WANT[] = "R|L|R|R|L|R|L|L|" RUDISEQ_NAME "|" RUDISEQ_VERSION "|on Felucca " FELUCCA_VERSION
+                                   "|H\xFCgelton Instruments";
         splash_seen[0] = 0;
         in_splash = 1;
         draw_splash();
         in_splash = 0;
-        {   /* the square whole on the screen (176 x 176 at 32,32, more than the canvas): its edges and square corners
-             * RAISE, BG just outside; its text's ink 16 px in from the left and the top (the bottom: AL_B, the hook) */
-            const int32_t q0 = 32, q1 = 32 + 176 - 1;
-            uint16_t bg = host_screen[0], ra = host_screen[(uint32_t)(q0 + 1) * 240u + (uint32_t)q0 + 1];
-            int32_t i, x, y, ix = 999, iy = 999, bad = ra == bg;
-            for (i = q0 - 1; i <= q1 + 1; i++) {
-                int32_t in = i >= q0 && i <= q1;
-                bad |= host_screen[(uint32_t)(q0 - 1) * 240u + (uint32_t)i] != bg || host_screen[(uint32_t)(q1 + 1) * 240u + (uint32_t)i] != bg
-                    || host_screen[(uint32_t)i * 240u + (uint32_t)(q0 - 1)] != bg || host_screen[(uint32_t)i * 240u + (uint32_t)(q1 + 1)] != bg;
-                if (in)
-                    bad |= host_screen[(uint32_t)q0 * 240u + (uint32_t)i] != ra || host_screen[(uint32_t)q1 * 240u + (uint32_t)i] != ra
-                        || host_screen[(uint32_t)i * 240u + (uint32_t)q0] != ra || host_screen[(uint32_t)i * 240u + (uint32_t)q1] != ra;
-            }
-            for (y = q0; y <= q1; y++)
-                for (x = q0; x <= q1; x++)
-                    if (host_screen[(uint32_t)y * 240u + (uint32_t)x] != ra) {
-                        if (x - q0 < ix) ix = x - q0;
-                        if (y - q0 < iy) iy = y - q0;
-                    }
-            if (bad || ix != 16 || iy != 16) {
-                if (rep) fprintf(rep, "FIND %-26s the splash square not whole (edges %s) or its text not 16 px in (left %d, top %d)\n",
-                                 cur_name, bad ? "off" : "ok", (int)ix, (int)iy);
+        {   /* RudimentSeq: the paradiddle row centred (SPL_ROW_X .. 240 - SPL_ROW_X - 1 on SPL_ROW_Y ..): its
+             * background just outside, the tiles two colours by hand (R L R R L R L L: 0 = 2 = 3, 1 = 4, 0 != 1), the
+             * corners of the screen the background */
+            const int32_t y = SPL_ROW_Y + 2, x0 = SPL_ROW_X;
+            uint16_t bg = host_screen[0], t[SPL_NT];
+            int32_t i, bad = host_screen[239] != bg || host_screen[239u * 240u] != bg || host_screen[240u * 240u - 1u] != bg;
+            for (i = 0; i < SPL_NT; i++)
+                t[i] = host_screen[(uint32_t)y * 240u + (uint32_t)(x0 + i * (SPL_TILE + SPL_GAP) + 2)];
+            bad |= host_screen[(uint32_t)y * 240u + (uint32_t)(x0 - 1)] != bg
+                || host_screen[(uint32_t)y * 240u + (uint32_t)(x0 + SPL_ROW_W)] != bg
+                || host_screen[(uint32_t)(SPL_ROW_Y - 1) * 240u + (uint32_t)x0] != bg
+                || host_screen[(uint32_t)(SPL_ROW_Y + SPL_TILE) * 240u + (uint32_t)x0] != bg
+                || t[0] == bg || t[1] == bg || t[0] == t[1] || t[2] != t[0] || t[3] != t[0] || t[4] != t[1]
+                || t[5] != t[0] || t[6] != t[1] || t[7] != t[1];
+            if (bad) {
+                if (rep) fprintf(rep, "FIND %-26s the splash's paradiddle row not centred / not two hand colours / the corners not background\n",
+                                 cur_name);
                 nfind++;
             }
         }

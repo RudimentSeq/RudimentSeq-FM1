@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* The firmware editor handler, USB framing and UART recovery against RAM flash.
  * Build with the generated tables and the same flags as hostsim.c. */
 static unsigned char host_samples[3][0x14000];
@@ -153,11 +154,13 @@ static int motion_locks(void)
         n = request(ED_MOTION, a, 6);
         bad += check("  the 129th: rc 2 (full)", host_wire[6] == 2 && motion.count == MOTION_MAX);
         a[1] = 8; n = request(ED_MOTION, a, 2);
-        ok = n == 5u + 7u + 128u * 4u + 128u + 1u && host_wire[8] == 0 && host_wire[9] == 1 && host_wire[10] == 0 &&
-             host_wire[11] == 1 && host_wire[12 + 127u * 4u] == 63 && host_wire[13 + 127u * 4u] == P_PAN &&
-             ed_rv(&host_wire[14 + 127u * 4u]) == -3 && host_wire[12 + 128u * 4u + 127u] == 1 &&
-             host_wire[12 + 128u * 4u] == 0 && n <= sizeof ed_out;
-        bad += check("  op 8: count and max as two 7-bit bytes (128), all 128 records, then their kinds", ok);
+        ok = n == 5u + 7u + MOTION_MAX * 4u + MOTION_MAX + 1u &&
+             host_wire[8] == (MOTION_MAX & 127u) && host_wire[9] == (MOTION_MAX >> 7) &&
+             host_wire[10] == (MOTION_MAX & 127u) && host_wire[11] == (MOTION_MAX >> 7) &&
+             host_wire[12 + (MOTION_MAX - 1u) * 4u] == 63 && host_wire[13 + (MOTION_MAX - 1u) * 4u] == P_PAN &&
+             ed_rv(&host_wire[14 + (MOTION_MAX - 1u) * 4u]) == -3 && host_wire[12 + MOTION_MAX * 4u + (MOTION_MAX - 1u)] == 1 &&
+             host_wire[12 + MOTION_MAX * 4u] == 0 && n <= sizeof ed_out;
+        bad += check("  op 8: count and max as two 7-bit bytes, all MOTION_MAX records, then their kinds", ok);
         a[1] = 8; a[2] = 0;
         bad += check("  op 8 with a further byte: no reply", !request(ED_MOTION, a, 3));
         motion_clear(&trk[1]);
@@ -186,7 +189,7 @@ static int preferences(void)
         host_wire[e - 26] == 0x4E && host_wire[e - 25] == 1 && host_wire[e - 24] == MENU_N &&   /* MENU settings: 33 items (1.6.1: 2ND CORE; a FELUCCA_CPU2=0 build 32) */
         host_wire[e - 23] == 0x52 && host_wire[e - 22] == 1 && host_wire[e - 21] == 4 &&   /* RATCH */
         host_wire[e - 20] == 0x4C && host_wire[e - 19] == 1 && host_wire[e - 18] == 1 &&   /* 1.1 parameter locks */
-        host_wire[e - 17] == 0x41 && host_wire[e - 16] == 1 && host_wire[e - 15] == 0 && host_wire[e - 14] == 1 &&   /* 1.2: 128 */
+        host_wire[e - 17] == 0x41 && host_wire[e - 16] == 1 && host_wire[e - 15] == (MOTION_MAX & 127u) && host_wire[e - 14] == (MOTION_MAX >> 7) &&   /* 1.2: MOTION_MAX records */
         host_wire[e - 13] == 0x54 && host_wire[e - 12] == 1 && host_wire[e - 11] == NUDGE_DIV &&   /* 1.2: NUDGE */
         host_wire[e - 10] == 0x57 && host_wire[e - 9] == 1 && host_wire[e - 8] == NTRK &&   /* 1.2: SONG lanes */
         host_wire[e - 7] == 0x56 && host_wire[e - 6] == 1 && host_wire[e - 5] == 32 &&   /* 1.4.1: FM6 voice bank */

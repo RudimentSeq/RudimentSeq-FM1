@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* 1.5.1, Discussion #199: SEQ > DETAIL, the step page between STEP and AUTOMATION, on the real sequencer and UI
  * sources (with the stubs of tests/ui_test.c):
  *   the page   SEQ goes STEP -> DETAIL -> AUTOMATION -> STEP; the cursor is STEP's
@@ -100,6 +101,10 @@ static int page_cycle(void)
     int bad = 0, ok;
     pattern(4);
     ok = str_eq(cur_page()->title, "STEP");
+    press(B_SEQ); frames(320);                               /* 1.8: SEQ's second page is RUDI (RudiSeq) */
+    ok &= str_eq(cur_page()->title, "RUDI") && cur_page()->graph == GR_RUDI && !detail_on() && song.seq_mode;
+    press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "RUDI 2") && cur_page()->graph == GR_RUDI;
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "DETAIL") && detail_on() && cur_page()->graph == GR_ROLL && ui.cursor == 4u &&
           song.seq_mode;
@@ -107,15 +112,15 @@ static int page_cycle(void)
     ok &= cur_page()->graph == GR_EVENTS && !detail_on();
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "STEP") && !detail_on();
-    bad += check("SEQ: STEP -> DETAIL (the same cursor) -> AUTOMATION -> STEP", ok);
+    bad += check("SEQ: STEP -> RUDI -> RUDI 2 -> DETAIL (the same cursor) -> AUTOMATION -> STEP", ok);
     go_detail();
     {
         char ti[20];
         page_title(ti);
-        ok = str_eq(ti, "DETAIL 2/3");
+        ok = str_eq(ti, "DETAIL 4/5");
     }
     ok &= help_page() && str_eq(help_page(), "[PRESETS]STEP[K1]CHANCE, 1:4, FILL");
-    bad += check("  its footer title DETAIL 2/3 (not the scale), its HELP hint", ok);
+    bad += check("  its footer title DETAIL 4/5 (not the scale), its HELP hint", ok);
     return bad;
 }
 

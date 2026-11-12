@@ -65,7 +65,7 @@ static int32_t ref_at(const aafont_t *f, uint32_t ch)       /* the glyph's numbe
 static uint32_t ref_gi(const aafont_t *f, uint32_t ch)      /* the glyph's number (its phases: g[n << psh] ..) */
 {
     int32_t k;
-    if (ch >= 'a' && ch <= 'z' && f->last < 'a') ch -= 32u;
+    if (ch >= 'a' && ch <= 'z' && ref_at(f, ch) < 0) ch -= 32u;   /* (gfx.c glyph: the capital for a lower case the face lacks) */
     k = ref_at(f, ch);
     if (k < 0 && ch == 0x85u) k = ref_at(f, '.');          /* the ellipsis */
     if (k < 0) k = ref_at(f, '?');
@@ -115,7 +115,7 @@ static int32_t ref_text(int32_t x, int32_t y, const aafont_t *f, const char *s, 
         uint32_t c = (uint8_t)*s, k = 0;
         const aag_t *g;
         int32_t lo, hi, pos;
-        if (c >= 'a' && c <= 'z' && f->last < 'a') c -= 32u;
+        if (c >= 'a' && c <= 'z' && ref_at(f, c) < 0) c -= 32u;
         if (prev) pen += ref_kern(f, prev, c);
         g = &f->g[ref_gi(f, c) * (uint32_t)n];
         if (n > 1 && g[1].off != g[0].off) {

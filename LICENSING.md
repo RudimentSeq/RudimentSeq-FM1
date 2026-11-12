@@ -7,6 +7,10 @@ texts are in `LICENSES/`.
 
 Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 
+This tree is a modified Felucca, "RudimentSeq": the modifications (listed in `CHANGES-RUDIMENTSEQ.md`,
+with dates) are Copyright (C) 2026 RudimentSeq (rudimentseq.com) and are licensed under the same
+`GPL-3.0-only`. Nothing below changes.
+
 ## What is GPL-3.0-only
 
 Every file in this tree that carries an `SPDX-License-Identifier: GPL-3.0-only` header:

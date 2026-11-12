@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Modified for RudimentSeq (rudimentseq.com), 2026-11: see CHANGES-RUDIMENTSEQ.md */
 /* Host test of the UI (firmware/src/ui*.c with the sound sources of hostsim.c;
  * the display and the HAL are stubs, the buttons and knobs are driven through them):
  *   SOUNDS     a sound load (PRESETS knob / page, TOOLS INIT, user preset) changes the sound only: the
@@ -2774,7 +2775,7 @@ static int test_page_cycles(void)
     ok = 1;
     for (i = 0; i < NPAGES; i++) {                       /* every page in a family its button reaches, and its LED */
         uint32_t f = PAGES[i].fam;
-        ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
+        ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS || PAGES[i].graph == GR_RUDI;   /* 1.8: RUDI pages */
         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
         ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK");   /* HOME's: MIXER CLOCK */
         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
@@ -2784,24 +2785,26 @@ static int test_page_cycles(void)
     }
     for (i = 0; i < NPAGES; i++)
         ok &= !str_eq(PAGES[i].title, "PATTERN") && !str_eq(PAGES[i].title, "CHANCE") && !str_eq(PAGES[i].title, "AUTO LIST");
-    bad += check("1.2: SEQ has STEP and AUTOMATION only; SONG is GLO's only page, PHRASES SAVE's, MIXER and CLOCK HOME's "
+    bad += check("1.2/1.8: SEQ is STEP, RUDI, RUDI 2, DETAIL, AUTOMATION; SONG is GLO's only page, PHRASES SAVE's, MIXER and CLOCK HOME's "
                  "(their LED HOME)", ok);
     {   /* 1.2: GLOBAL and SYSTEM are gone; their knobs: BPM SWG CLK on HOME > CLOCK, TUNE and ROUT on no page (the MENU's),
-         * MIDI SYNC CPU on none (INFO shows the USB state and the CPU) */
+         * MIDI CPU on none (INFO shows the USB state and the CPU); 1.8: SYNC (MIDI clock out) is CLOCK's fourth knob */
         uint32_t k, clock = 0;
         ok = 1;
         for (i = 0; i < NPAGES; i++) {
             ok &= !str_eq(PAGES[i].title, "GLOBAL") && !str_eq(PAGES[i].title, "SYSTEM");
             for (k = 0; k < 4u && PAGES[i].scope == SC_GLOBAL; k++)
                 ok &= PAGES[i].id[k] != G_TUNE && PAGES[i].id[k] != G_ROUTE && PAGES[i].id[k] != G_MIDI &&
-                      PAGES[i].id[k] != G_SYNC && PAGES[i].id[k] != G_INFO;
+                      PAGES[i].id[k] != G_INFO;
+            if (str_eq(PAGES[i].title, "CLOCK"))
+                ok &= PAGES[i].id[3] == G_SYNC && GP[G_SYNC].def == 0 && GP[G_SYNC].max == 1;
             if (str_eq(PAGES[i].title, "CLOCK"))
                 clock = i + 1u;
         }
         ok &= clock && PAGES[clock - 1u].fam == FAM_TRK && PAGES[clock - 1u].scope == SC_GLOBAL &&
               PAGES[clock - 1u].id[0] == G_BPM && PAGES[clock - 1u].id[1] == G_SWING && PAGES[clock - 1u].id[2] == G_CLOCK &&
-              PAGES[clock - 1u].id[3] == 0xFFu;
-        bad += check("1.2: no GLOBAL, no SYSTEM page; HOME > CLOCK has BPM SWG CLK (three knobs), TUNE and ROUT on no page", ok);
+              PAGES[clock - 1u].id[3] == G_SYNC;   /* (1.8: SYNC, MIDI clock out, OFF by default, by CLK) */
+        bad += check("1.2: no GLOBAL, no SYSTEM page; HOME > CLOCK has BPM SWG CLK SYNC (1.8), TUNE and ROUT on no page", ok);
     }
     /* remembered pages: one that left its family, or out of range, gives the family's first (1.2: GLO's whatever it was,
      * GLOBAL and SYSTEM too, now SONG; HOME's never remembered: from HOME the MIXER) */
@@ -6887,19 +6890,19 @@ static int test_seq_tools(void)
     ui_power_on();
     go_page(GR_ROLL); frame();
     press(B_SEQ); frames(320);
-    ok = str_eq(cur_page()->title, "DETAIL") && msg_is("HOLD [SEQ] QUICK");   /* (1.5.1, #199) */
+    ok = str_eq(cur_page()->title, "RUDI");            /* 1.8: STEP -> RUDI (RudiSeq is SEQ's second page) */
+    press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "RUDI 2");
+    press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "DETAIL") && cur_page()->graph == GR_ROLL;
     press(B_SEQ); frames(320);
     ok &= cur_page()->graph == GR_EVENTS && str_eq(cur_page()->title, "AUTOMATION");
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "STEP");
-    press(B_SEQ); frames(320);
-    press(B_SEQ); frames(320);
-    ok &= cur_page()->graph == GR_EVENTS;
-    bad += check("1.2: a tap on STEP: DETAIL (1.5.1), AUTOMATION, then STEP again (three SEQ pages; the hint until the layer "
-                 "was opened)", ok);
+    bad += check("1.8: a tap on STEP cycles RUDI, RUDI 2, DETAIL, AUTOMATION, then STEP again (five SEQ pages)", ok);
     go_title("ENV"); frame();
     press(B_SEQ); frames(320);
-    ok = cur_page()->graph == GR_EVENTS;                /* (the SEQ page shown last) */
+    ok = str_eq(cur_page()->title, "STEP") && cur_page()->graph == GR_ROLL;   /* (the SEQ page shown last) */
     go_home(); frame();
     for (k = 0; k < NPAGES; k++)                        /* a remembered page that is no SEQ page any more: STEP */
         if (PAGES[k].graph == GR_SONG) ui.fam_last[FAM_SEQ] = (uint8_t)k;
@@ -7242,14 +7245,14 @@ static int test_layer_lock(void)
     press(B_SEQ); frames(400);                          /* (1.2: SEQ, GLO's one page cycles no more) */
     ok = str_eq(cur_page()->title, "STEP") && !ui.lock;
     press(B_SEQ); frames(400);
-    ok &= str_eq(cur_page()->title, "DETAIL") && !ui.lock && !ui.layer;   /* (1.5.1) */
+    ok &= str_eq(cur_page()->title, "RUDI") && !ui.lock && !ui.layer;   /* (1.8: STEP -> RUDI) */
     press(B_SEQ); frames(400);
-    ok &= str_eq(cur_page()->title, "AUTOMATION") && !ui.lock && !ui.layer;
-    press(B_SEQ);
+    ok &= str_eq(cur_page()->title, "RUDI 2") && !ui.lock && !ui.layer;
+    press(B_SEQ);                                        /* -> DETAIL */
     btn_down(B_SEQ); frames(500);
     ok &= ui.layer == LAYER_SEQ && !ui.lock;
     btn_up(B_SEQ); frame();
-    ok &= !ui.layer && !ui.lock && str_eq(cur_page()->title, "STEP");
+    ok &= !ui.layer && !ui.lock && str_eq(cur_page()->title, "DETAIL");
     press(B_GLO); frames(400);
     ok &= str_eq(cur_page()->title, "SONG") && !ui.lock;
     press(B_GLO);
