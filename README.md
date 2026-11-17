@@ -39,6 +39,8 @@ master. The FM-1's TRS jack is MIDI in only; MIDI out is over USB.
 
 ## Install
 
+**Quick guide:** [docs/QUICK-GUIDE.md](docs/QUICK-GUIDE.md) has every button, knob and quick-layer key of Felucca plus the RUDI pages on three pages; a printable PDF is attached to each release.
+
 The FM-1 connects by USB; no extra hardware. Installing any firmware is at your own risk.
 
 - Web installer: https://rudimentseq.github.io/RudimentSeq-FM1/ (Chrome or Edge, Web MIDI; the same page as Felucca's, built from this tree by `web/make_site.py`).
