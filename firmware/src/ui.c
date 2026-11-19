@@ -1869,3 +1869,13 @@ static int act_ready(void)
         return !seq_is_empty(TSEL);
     return 1;
 }
+
+/* RudiSeq: the picked action is a save the running transport blocks. The card says STOP and the footer
+ * "[PLAY] STOP TO SAVE" (lit), where a dark OCT+ said nothing (the 2 s message was easy to miss). */
+static int act_stop(void)
+{
+    uint32_t c = act_col();
+    if (!c-- || !song.playing || act_ready())
+        return 0;
+    return str_eq(act_name(c), "SAVE");
+}

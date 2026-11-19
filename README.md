@@ -57,7 +57,7 @@ Felucca's installer and web editor work with a RudimentSeq device: they accept b
 
 ## Status
 
-r0.1.1, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
+r0.1.2, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
 The host test suite runs green but for one upstream text-spacing check. Please report problems in
 the issues of this repository (https://github.com/RudimentSeq/RudimentSeq-FM1), not to Felucca's author. Contact: jem@rudimentseq.com.
 

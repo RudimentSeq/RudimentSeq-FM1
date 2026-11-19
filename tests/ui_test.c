@@ -42,6 +42,7 @@
 #endif
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 static uint32_t host_slots[3u * 0x14000u / 4u];          /* USR1..3 (zero: empty), as the flash at 0xA0000 */
 #define SMP_USER_XIP(k) ((const uint8_t *)host_slots + (k) * SMP_USER_SIZE)
 #define main hostsim_main
@@ -295,6 +296,7 @@ static uint8_t stored_note(uint32_t slot, uint32_t track, uint32_t step)
     return proj_import(&p, &proj_slot[slot], sizeof proj_slot[slot]) ? p.t[track].step[step].note[0] : 0;
 }
 static int msg_is(const char *s) { return ui.msg_t && str_eq(ui.msg, s); }
+static int col_has(uint32_t c, const char *s) { return strstr(ui.col[c], s) != 0; }   /* the card's cache key: label|value|unit */
 static void my_steps(track_t *t)                  /* "recorded" steps */
 {
     uint32_t i;
@@ -920,11 +922,14 @@ static int test_save(void)
     ui.msg_t = 0;
     turn(EN_K4, 1);                               /* SAVE picked */
     bad += check("PROJECT KNOB 4 picks SAVE, saves nothing", ui.act == 4u && !project_used(0) && !ui.msg_t);
+    bad += check("RudiSeq: playing, the picked SAVE card says STOP (footer: PLAY STOP TO SAVE)",
+                 act_stop() && col_has(3, "SAVE|STOP|"));
     press(B_OCTUP);
     bad += check("OCT+ while playing: STOP TO SAVE, no NAME", msg_is("STOP TO SAVE") && !project_used(0) &&
                  song.g[G_SAVE] == 0 && !name_on());
     stop_transport();
     turn(EN_K4, 1);
+    bad += check("RudiSeq: stopped, the SAVE card is back to its OCT+ keycap", !act_stop() && col_has(3, "SAVE|[OCT+]|"));
     press(B_OCTUP);
     bad += check("stopped, an empty slot: OCT+ opens NAME (no name yet: PROJECT A)", name_on() && nm.kind == NK_PROJ_SAVE &&
                  nm.len == 0u && str_eq(nm.ph, "PROJECT A") && !project_used(0));
@@ -986,7 +991,12 @@ static int test_save(void)
     turn(EN_K3, 1);                               /* ERASE */
     press(B_OCTUP);
     bad += check("USER ERASE while playing: STOP TO SAVE", msg_is("STOP TO SAVE") && up_used(4));
+    turn(EN_K4, 1);                               /* SAVE picked while playing */
+    bad += check("RudiSeq: USER SAVE picked while playing: the card says STOP", ui.act == 4u && act_stop() && col_has(3, "SAVE|STOP|"));
     stop_transport();
+    frames(48);
+    bad += check("RudiSeq: stopped, USER SAVE breathes again", !act_stop() && act_ready() && col_has(3, "SAVE|[OCT+]|"));
+    turn(EN_K4, -1);                              /* dropped */
     return bad;
 }
 

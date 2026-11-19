@@ -780,8 +780,9 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
 /* an action's column (act_cols): picked, the OCT+ keycap (accent while it would do something); else "--" */
 static void draw_act_column(uint32_t c, const char *label, uint16_t vc, uint32_t icon)   /* icon: ICON_AUTO = by label */
 {
-    int picked = act_col() == c + 1u;
-    draw_column(c, label, picked ? "[OCT+]" : "--", "", picked ? (act_ready() ? T_ACCENT : T_DIM) : vc, -1, icon);
+    int picked = act_col() == c + 1u, stop = picked && act_stop();   /* RudiSeq: why OCT+ would not act */
+    draw_column(c, label, stop ? "STOP" : picked ? "[OCT+]" : "--", "",
+                stop ? T_ACCENT : picked ? (act_ready() ? T_ACCENT : T_DIM) : vc, -1, icon);
 }
 
 /* action pages: the footer's first row says what OCT+ and OCT- do ("OCT+ LOAD   OCT- BACK") */
@@ -867,7 +868,7 @@ static void draw_foot(void)
     if (act_cols()) {                                  /* the hint, and whether OCT+ would act */
         char ha[16], hb[16];
         foot_hint(ha, hb);
-        sig += str_hash(str_hash(act_ready() ? 7u : 3u, ha), hb) + foot_rename() * 7717u;
+        sig += str_hash(str_hash((act_ready() ? 7u : 3u) + (act_stop() ? 11u : 0u), ha), hb) + foot_rename() * 7717u;
     }
     if (grid_on())
         sig += 0x51EDu + (uint32_t)black_held(GK_ACC) * 977u;
@@ -888,16 +889,17 @@ static void draw_foot(void)
     } else if (act_cols()) {                          /* row 1: the OCT+ / OCT- hint in place of the steps */
         char ha[16], hb[16];
         khint_t kh[3];
-        uint32_t rn = foot_rename();
+        uint32_t rn = foot_rename(), go;
         foot_hint(ha, hb);                            /* "OCT+ LOAD", "OCT- BACK": keycaps and their words */
-        kh[0] = (khint_t){KC_OCTUP, ha + 5};
+        go = act_ready() || act_stop() ? 1u : 0u;     /* RudiSeq: "[PLAY] STOP TO SAVE" lit, in place of a dark OCT+ */
+        kh[0] = act_stop() ? (khint_t){KC_PLAY, "STOP TO SAVE"} : (khint_t){KC_OCTUP, ha + 5};
         kh[1] = (khint_t){KC_OCTDN, hb + 5};
         if (rn) {                                     /* USER / PROJECT: "EDIT NAME" between them */
             kh[2] = kh[1];
             kh[1] = (khint_t){KC_EDIT, cur_page()->graph == GR_EVENTS ? "DELETE" : "NAME"};
-            cv_key_row(8, 232, 2, kh, 3, (act_ready() ? 1u : 0u) | (rn == 2u ? 2u : 0u) | 4u, T_BG);
+            cv_key_row(8, 232, 2, kh, 3, go | (rn == 2u ? 2u : 0u) | 4u, T_BG);
         } else {
-            cv_key_row(8, 232, 2, kh, 2, act_ready() ? 3u : 2u, T_BG);
+            cv_key_row(8, 232, 2, kh, 2, go | 2u, T_BG);
         }
     } else if (ui.ml.on) {                               /* row 1: MIDI LEARN's line, OCT+ DONE at the right */
         khint_t kh = {KC_OCTUP, "DONE"};

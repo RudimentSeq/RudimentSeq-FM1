@@ -48,6 +48,17 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-19: STOP TO SAVE on the card (r0.1.2)
+
+- `ui.c` act_stop, `ui_draw.c`: when the picked action is a save and the transport runs, the card
+  says STOP (accent) in place of a dark OCT+ keycap, and the footer's hint row reads
+  "[PLAY] STOP TO SAVE", lit; both go back when the transport stops. The 2 s message stays.
+  (Jem saved nothing for a day because the dark keycap said nothing.)
+- `core.h`: RUDISEQ_VERSION r0.1.2 (ABOUT, splash, console, editor INFO).
+- `tests/ui_test.c`: the card's text while playing and after the stop, PROJECT and USER pages.
+- Built and flashed as one package (FM1-flashes flash 15, md5 028d78bc), tried on the FM-1, released as
+  r0.1.2 with those exact bytes.
+
 ## 2026-11-19: release r0.1.1
 
 - The three 2026-11-18 sections below, built and flashed as one package (FM1-flashes flash 14,

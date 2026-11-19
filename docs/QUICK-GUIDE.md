@@ -1,6 +1,6 @@
 # RudimentSeq on the FM-1: quick guide
 
-Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.1, 2026-11-19.
+Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.2, 2026-11-19.
 
 ![FM-1 controls](controls.jpg)
 
@@ -104,7 +104,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 | Want | Do |
 |---|---|
-| Save a sound | stop, tap SAVE (USER), KNOB 1 picks a slot, OCT+, OCT+ again (name it with the keys). Saved with RUDI on, the sound carries its rudiment: load it anywhere and the lane comes back |
+| Save a sound | stop, tap SAVE (USER), KNOB 1 picks a slot, OCT+, OCT+ again (name it with the keys). While the transport runs the SAVE card says STOP and the footer "PLAY: STOP TO SAVE". Saved with RUDI on, the sound carries its rudiment: load it anywhere and the lane comes back |
 | Load a sound | PRESETS knob on any page, or SAVE > PRESETS to browse by category |
 | Save / load a project | SAVE > PROJECT: KNOB 1 slot A to D, KNOB 3 LOAD, KNOB 4 SAVE (OCT+ confirms) |
 | Start a new project | MENU > SYSTEM > CLEAR ALL, OCT+ twice (cannot be undone) |
