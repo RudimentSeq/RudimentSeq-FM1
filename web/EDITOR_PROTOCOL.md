@@ -74,6 +74,11 @@ track's aftertouch, the keys' or MIDI's, routed as a modulation slot of its own.
 changed; an editor that takes P_COUNT and P_E0 from `INFO` keeps working. Projects stay FUN10 (114 at byte 66; 4 bytes
 to spare before MIDI IN TRACK's three).
 
+**RudimentSeq (125 parameters, FUN10 as it was):** the fork's eleven track parameters sit before the engine's eight:
+`RUDI` (106: OFF, 1X..4X), `RUDMT` (107), `PRB R` / `PRB L` (108, 109), `SMART` (110), `FTHR` (111), `NTE R` / `NTE L`
+(112, 113), `RNG R` / `RNG L` (114, 115: 0..24) and `CHG` (116: %): P_COUNT 125, P_E0 117. No command changed; an editor
+that takes P_COUNT and P_E0 from `INFO` keeps working. Projects stay FUN10 (125 at byte 66; MOTION_MAX 112).
+
 ## Framing
 
 A request is `F0 7D 46 4C <cmd> <args...> F7`:

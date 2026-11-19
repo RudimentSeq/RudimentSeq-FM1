@@ -1,6 +1,6 @@
 # RudimentSeq on the FM-1: quick guide
 
-Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1, 2026-11-17.
+Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.1, 2026-11-19.
 
 ![FM-1 controls](controls.jpg)
 
@@ -33,7 +33,7 @@ Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki 
 | Button | Taps go round | Held |
 |---|---|---|
 | HOME | HOME, MIXER (LEVEL PAN REV MUTE), CLOCK (BPM, swing, clock source, **SYNC**) | the menu |
-| SEQ | STEP, **RUDI**, **RUDI 2**, DETAIL, AUTOMATION | SEQ TOOLS |
+| SEQ | STEP, **RUDI**, **RUDI 2**, **RUDI 3**, DETAIL, AUTOMATION | SEQ TOOLS |
 | GLO | SONG | GLO layer: mutes, solos, levels, tap tempo |
 | SAVE | USER, PRESETS, PHRASES, PROJECT, TOOLS | undo |
 | LFO | LFO, LFO 2, LFO DEST, MOD | MOMENTARY: hold LFO, turn a knob, let go and it snaps back (OCT+ while holding keeps it) |
@@ -92,8 +92,9 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 ## RudimentSeq: the rudiment lanes
 
-- **SEQ, tap twice** (STEP then RUDI). KNOB 1 **RUDI** ON: the track stops reading its steps and plays the rudiment. KNOB 2 **RUDMT** picks one of 174. KNOB 3 **NTE R** and KNOB 4 **NTE L**: the right and left hand's notes (any kit sound, any engine note, or external gear over USB MIDI).
+- **SEQ, tap twice** (STEP then RUDI). KNOB 1 **RUDI** OFF, 1X, 2X, 3X or 4X: the track stops reading its steps and plays the rudiment, a hit every 1 to 4 steps of the track (3X on 1/16 is the dotted-eighth lope; hold SEQ, KNOB 2 for the track's DIV). KNOB 2 **RUDMT** picks one of 174. KNOB 3 **NTE R** and KNOB 4 **NTE L**: the right and left hand's notes (any kit sound, any engine note, or external gear over USB MIDI).
 - **Tap SEQ again** for RUDI 2: KNOB 1 **SMART** (a 128-step scene cycle that raises and lowers the density), KNOB 2 **FTHR** (feathering, the ghosts get quieter), KNOB 3 **PRB R**, KNOB 4 **PRB L** (hand probabilities, thin a hand out).
+- **Tap SEQ again** for RUDI 3: KNOB 1 **RNG R** and KNOB 2 **RNG L**, a range in semitones (0 to 24) above the hand's note: the hand plays a random note of the track's scale in that range (SCL page: ROOT and SCALE, CHR for any note). KNOB 3 **CHG** is how often a hit picks a new note: 100 scatters, 20 drifts.
 - Each of the four tracks has its own lane and settings. They save with the project and come back at power-on.
 - **MIDI out** is automatic: the sequencer, the lanes and the arp go out over USB on each track's channel, and no note is ever left hanging.
 - **HOME > CLOCK, KNOB 4 SYNC ON**: MIDI clock, Start and Stop out when the FM-1 is the clock master.
@@ -103,7 +104,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 | Want | Do |
 |---|---|
-| Save a sound | stop, tap SAVE (USER), KNOB 1 picks a slot, OCT+, OCT+ again (name it with the keys) |
+| Save a sound | stop, tap SAVE (USER), KNOB 1 picks a slot, OCT+, OCT+ again (name it with the keys). Saved with RUDI on, the sound carries its rudiment: load it anywhere and the lane comes back |
 | Load a sound | PRESETS knob on any page, or SAVE > PRESETS to browse by category |
 | Save / load a project | SAVE > PROJECT: KNOB 1 slot A to D, KNOB 3 LOAD, KNOB 4 SAVE (OCT+ confirms) |
 | Start a new project | MENU > SYSTEM > CLEAR ALL, OCT+ twice (cannot be undone) |
@@ -111,7 +112,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 ## The menu (hold HOME)
 
-ALGORITHM moves between the tabs DISPLAY, CONTROL, AUDIO, MIDI, SYSTEM; PRESETS moves through the rows; any knob or OCT+ / OCT− changes the value; HOME closes it. Worth knowing: COLOR (palettes), LARGE (big knob cards), FX LATCH, BPM LOCK, CLICK and COUNT-IN, MIDI IN (CH1-4, SEL, TRACK …), USB SERIAL OFF on macOS 13 to 15 for USB audio in, HELP ON for a hint when a page opens, ABOUT (shows RudimentSeq r0.1).
+ALGORITHM moves between the tabs DISPLAY, CONTROL, AUDIO, MIDI, SYSTEM; PRESETS moves through the rows; any knob or OCT+ / OCT− changes the value; HOME closes it. Worth knowing: COLOR (palettes), LARGE (big knob cards), FX LATCH, BPM LOCK, CLICK and COUNT-IN, MIDI IN (CH1-4, SEL, TRACK …), USB SERIAL OFF on macOS 13 to 15 for USB audio in, HELP ON for a hint when a page opens, ABOUT (shows the RudimentSeq release).
 
 ## If something goes wrong
 

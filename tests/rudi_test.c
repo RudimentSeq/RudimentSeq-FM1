@@ -86,6 +86,17 @@ int main(int argc, char **argv)
     trk[1].p[P_RUDSMA] = 1;
     trk[1].p[P_RUDNR] = 42;
     trk[1].p[P_RUDNL] = 46;
+    host_drums(&trk[2]);                    /* T3: Single Stroke Roll at RUDI 3X (a hit every 3rd track step), silent */
+    trk[2].p[P_LEVEL] = 0;
+    trk[2].p[P_RUDION] = 3;
+    trk[2].p[P_RUDI] = 0;
+    host_drums(&trk[3]);                    /* T4: RUDI 3, the right hand random over an octave of C major, silent */
+    trk[3].p[P_LEVEL] = 0;
+    trk[3].p[P_RUDION] = 1;
+    trk[3].p[P_RUDI] = 0;
+    trk[3].p[P_RUDNR] = 48; trk[3].p[P_RUDRR] = 12; trk[3].p[P_RUDCHG] = 100;
+    trk[3].p[P_RUDNL] = 48; trk[3].p[P_RUDRL] = 0;
+    trk[3].p[P_ROOT] = 0; trk[3].p[P_SCALE] = 1;   /* C MAJ */
 
     period = div_samples((uint32_t)trk[0].p[P_SDIV]);
     bar = period * 16u;
@@ -137,6 +148,32 @@ int main(int argc, char **argv)
     }
     if (!rudi_stat_fired[1][0] || !rudi_stat_fired[1][1]) {
         printf("rudi: FAIL T2 both hands should fire\n"); fails++;
+    }
+    /* track 3 (RUDI 3X, 2026-11-18): a lane step every third track step, every lane step fired (prob 100, no rests) */
+    printf("rudi: T3 (3X) lane steps %u fired R %u L %u   (T1 track steps %u)\n",
+           rudi_stat_steps[2], rudi_stat_fired[2][0], rudi_stat_fired[2][1], rudi_stat_steps[0]);
+    if (rudi_stat_steps[2] * 3u + 3u < rudi_stat_steps[0] || rudi_stat_steps[2] * 3u > rudi_stat_steps[0] + 3u) {
+        printf("rudi: FAIL T3 at 3X should step a third as often as T1\n"); fails++;
+    }
+    if (rudi_stat_fired[2][0] + rudi_stat_fired[2][1] != rudi_stat_steps[2] ||
+        rudi_stat_fired[2][0] + 1u < rudi_stat_fired[2][1] || rudi_stat_fired[2][1] + 1u < rudi_stat_fired[2][0]) {
+        printf("rudi: FAIL T3 should fire every lane step, R and L alternating (within one)\n"); fails++;
+    }
+    /* track 4 (RUDI 3, 2026-11-18): the right hand's notes lie in C major between 48 and 60 and vary; the left hand
+     * (RNG 0) stays on 48 */
+    {
+        uint32_t j, distinct = 0, seen[128] = {0}, bad = 0, lbad = 0, rn = 0;
+        for (j = 0; j < rudi_stat_nn; j++) {
+            uint32_t hand = rudi_stat_note[j] >> 7, nt = rudi_stat_note[j] & 127u;
+            if (hand) { lbad += nt != 48u; continue; }
+            rn++;
+            if (nt < 48u || nt > 60u || !((0xAB5u >> ((nt - 48u) % 12u)) & 1u)) bad++;
+            if (!seen[nt]) { seen[nt] = 1; distinct++; }
+        }
+        printf("rudi: T4 (RUDI 3) notes %u, R %u (%u distinct, %u off the scale or range), L off 48: %u\n", rudi_stat_nn, rn, distinct, bad, lbad);
+        if (rudi_stat_nn < 32u || bad || lbad || distinct < 3u) {
+            printf("rudi: FAIL T4 random notes should stay on C major within the octave and vary\n"); fails++;
+        }
     }
     if (energy / (int64_t)frames < 1000) {
         printf("rudi: FAIL render is (near) silent\n"); fails++;

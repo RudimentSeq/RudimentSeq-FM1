@@ -25,7 +25,7 @@ const ok = (cond, what) => { console.log(`${what.padEnd(64)} ${cond ? "ok" : "FA
 const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 const py = (code, ...args) => execFileSync("python3", ["-c", code, ...args], { maxBuffer: 1 << 26 });
 const HERE = fileURLToPath(new URL(".", import.meta.url));  /* decodes %20 etc. — a checkout path with spaces */
-const PC = 122, PE = 114;   /* today's P_COUNT and P_E0 (core.h): RudiSeq's 8 at 106..113, the engine's 8 at E0..E7 = PE..PC-1 */
+const PC = 125, PE = 117;   /* today's P_COUNT and P_E0 (core.h): RudiSeq's 8 at 106..113 + RUDI 3's 3 at 114..116, the engine's 8 at E0..E7 = PE..PC-1 */
 /* what lives outside web/, each overridable (a web-only checkout passes them, or the checks skip):
    FELUCCA_DESC  the firmware's parameter / protocol table (tests/descdump.c -> build/host/desc.json)
    FELUCCA_TOOLS the firmware's tools (tools/fm1_sample_upload.py, the sample format's reference)
@@ -718,7 +718,7 @@ async function editorLibrarian() {
   ok(file.format === "felucca-library" && file.version === 1 && file.pCount === PC && file.paramLabels.length === PC && file.paramLabels[81] === "CHRD" && file.paramLabels[82] === "VOIC" &&
     file.paramLabels[83] === "KICK" && file.paramLabels[90] === "BELL" && file.paramLabels.slice(91, 96).join() === "SYNC,TRIG,POL,QNTZ,SPRD" &&
     file.paramLabels.slice(96, 106).join() === "INSRT,INS A,INS B,INS C,MIX,TYPE,ESYNC,AT,ATDST,ATAMT" &&
-    file.paramLabels.slice(106, PE).join() === "RUDI,RUDMT,PRB R,PRB L,SMART,FTHR,NTE R,NTE L" &&
+    file.paramLabels.slice(106, PE).join() === "RUDI,RUDMT,PRB R,PRB L,SMART,FTHR,NTE R,NTE L,RNG R,RNG L,CHG" &&
     file.engines.length === 14,
     "library file: versioned, with P_COUNT, labels and engines");
   const back = E.readLibraryFile(file, ctx);

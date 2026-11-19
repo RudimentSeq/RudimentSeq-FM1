@@ -50,8 +50,9 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
     {"TOOLS", "[K1]CLEAR[K2]INIT, CLEAN[OCT+]DO"},   /* (1.5.5, #190: KNOB 2 on, CLEAN INIT) */
     {"ARP", "[K1]MODE[KEYS]CHORD[ARP]ARP 2"},
     {"ARP 2", "[K3]HOLD[K4]ORDER[ARP]ARP"},   /* (1.8: as its card) */
-    {"RUDI", "[K1]ON[K2]RUDIMENT[K3-4]NOTES"},   /* RudiSeq (1.8): SEQ's first page; K3-4 = the hands' pitches */
+    {"RUDI", "[K1]RATE[K2]RUDIMENT[K3-4]NOTES"},   /* RudiSeq (1.8): SEQ's first page; K3-4 = the hands' pitches */
     {"RUDI 2", "[K1]SMART[K2]FEATHER[K3-4]HAND %"},
+    {"RUDI 3", "[K1]RNG R[K2]RNG L[K3]CHANGE %"},   /* 2026-11-18: random notes on the track's scale */
     {"STEP", "[REC]WRITE[K1]STEP[SEQ]RUDI"},   /* (1.5.1: SEQ to DETAIL; 1.8: SEQ to RUDI, the keys write once armed) */
     {"DETAIL", "[PRESETS]STEP[K1]CHANCE, 1:4, FILL"},   /* (1.5.5: the conditions past 100 %) */
     {"AUTOMATION", "[K1]ROW[OCT+]DO[EDIT]DELETE"},

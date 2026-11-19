@@ -18,6 +18,8 @@ typedef struct {
     uint8_t sstep;      /* Smart Prob step 0..127, advances every step, rests too */
     uint8_t lastrud;    /* the P_RUDI last played: a turn restarts the sticking */
     uint8_t sounding;   /* the note held until the next step + 1, 0: none */
+    uint8_t skip;       /* track steps still to pass before the lane's next step (RUDI 2X..4X; 1X: always 0) */
+    uint8_t cur[2];     /* RUDI 3: the hand's last random note + 1 (0: none yet); kept on 100 - CHG % of its hits */
     uint32_t rng;
 } rudi_lane_t;
 static rudi_lane_t rudi[NTRK];
@@ -54,10 +56,36 @@ static void rudi_init(void)
     rudi_ready = 1;
 }
 
-static uint32_t rudi_rand100(rudi_lane_t *r)
+static uint32_t rudi_rand(rudi_lane_t *r)          /* xorshift32: the lane's own dice */
 {
     r->rng ^= r->rng << 13; r->rng ^= r->rng >> 17; r->rng ^= r->rng << 5;
-    return (r->rng >> 16) % 100u;
+    return r->rng >> 16;
+}
+static uint32_t rudi_rand100(rudi_lane_t *r) { return rudi_rand(r) % 100u; }
+
+static int scale_has(const track_t *t, int32_t n)  /* note n is on the track's scale (SCL page: ROOT, SCALE; CHR: any) */
+{
+    return (int)((scale_mask(t) >> (uint32_t)((n - t->p[P_ROOT] + 120) % 12)) & 1u);
+}
+
+/* RUDI 3 (2026-11-18): the hand's note. RNG 0: its NTE, as always. RNG 1..24: a note of the track's scale between
+ * NTE and NTE + RNG, drawn at random on CHG % of the hand's hits and kept on the rest, so 100 scatters and 20 drifts */
+static uint32_t rudi_note(track_t *t, rudi_lane_t *r, uint32_t hand)
+{
+    int32_t base = t->p[hand ? P_RUDNL : P_RUDNR] & 127, range = t->p[hand ? P_RUDRL : P_RUDRR], c[25];
+    uint32_t cur = r->cur[hand], n = 0, k;
+    if (range <= 0)
+        return (uint32_t)base;
+    if (cur && (int32_t)cur - 1 >= base && (int32_t)cur - 1 <= base + range && rudi_rand100(r) >= (uint32_t)t->p[P_RUDCHG])
+        return cur - 1u;                           /* kept */
+    for (k = 0; k <= (uint32_t)range && n < 25u; k++)   /* the scale's notes in the range */
+        if (base + (int32_t)k <= 127 && scale_has(t, base + (int32_t)k))
+            c[n++] = base + (int32_t)k;
+    if (!n)
+        return (uint32_t)base;
+    k = (uint32_t)c[rudi_rand(r) % n];
+    r->cur[hand] = (uint8_t)(k + 1u);
+    return k;
 }
 
 static void rudi_hush(track_t *t)                  /* the held note off (stop, mode off) */
@@ -77,6 +105,8 @@ static void rudi_restart(void)                     /* PLAY: every rudiment from 
     for (i = 0; i < NTRK; i++) {
         rudi[i].hit = 0;
         rudi[i].sstep = 0;
+        rudi[i].skip = 0;
+        rudi[i].cur[0] = rudi[i].cur[1] = 0;
         rudi[i].lastrud = (uint8_t)((uint32_t)trk[i].p[P_RUDI] % NUM_RUDIMENTS);
     }
 }
@@ -85,12 +115,17 @@ static void rudi_restart(void)                     /* PLAY: every rudiment from 
 static uint32_t rudi_stat_steps[NTRK], rudi_stat_fired[NTRK][2];
 static uint8_t rudi_stat_hand[64];
 static uint32_t rudi_stat_n;
+static uint8_t rudi_stat_note[64];      /* track 4's notes, bit 7 the hand (RUDI 3) */
+static uint32_t rudi_stat_nn;
 #define RUDI_STAT_STEP(k) (rudi_stat_steps[k]++)
+#define RUDI_STAT_NOTE(k, hand, note) do { if ((k) == 3u && rudi_stat_nn < 64u) \
+    rudi_stat_note[rudi_stat_nn++] = (uint8_t)(((note) & 127u) | ((hand) ? 128u : 0u)); } while (0)
 #define RUDI_STAT_FIRE(k, hand) do { rudi_stat_fired[k][(hand) ? 1 : 0]++; \
     if ((k) == 0u && rudi_stat_n < 64u) rudi_stat_hand[rudi_stat_n++] = (uint8_t)((hand) ? 1 : 0); } while (0)
 #else
 #define RUDI_STAT_STEP(k) ((void)0)
 #define RUDI_STAT_FIRE(k, hand) ((void)0)
+#define RUDI_STAT_NOTE(k, hand, note) ((void)0)
 #endif
 
 /* a step of track t starts: the rudiment's next hit (seq_tick, in rudi mode) */
@@ -100,7 +135,14 @@ static __attribute__((noinline)) void rudi_step(track_t *t)
     uint32_t rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
     const rudiment_t *rd = &RUDIMENTS[rud];
     const rudi_hit_t *h;
-    uint32_t ss = r->sstep, p, vel, note, feather;
+    uint32_t ss = r->sstep, p, vel, note, feather, every = (uint32_t)t->p[P_RUDION];
+    /* RUDI 2X..4X: the lane steps every 2..4 track steps; between them the last hit keeps sounding (its gate is
+     * one lane step) */
+    if (r->skip) {
+        r->skip--;
+        return;
+    }
+    r->skip = (uint8_t)(every > 1u ? every - 1u : 0u);
     if (r->lastrud != rud) {                       /* the knob turned: the new sticking from its top */
         r->lastrud = (uint8_t)rud;
         r->hit = 0;
@@ -125,8 +167,9 @@ static __attribute__((noinline)) void rudi_step(track_t *t)
         vel = 90u - (90u - 20u) * feather / 100u;
     if (h->grace)
         vel = 30;
-    note = (uint32_t)(h->hand ? t->p[P_RUDNL] : t->p[P_RUDNR]) & 127u;
+    note = rudi_note(t, r, h->hand ? 1u : 0u);     /* NTE, or RUDI 3's random note of the scale */
     seq_note_on(t, note, vel);                     /* the voice and MIDI OUT (seq.c) */
+    RUDI_STAT_NOTE(trk_index(t), h->hand, note);
     r->sounding = (uint8_t)(note + 1u);
     RUDI_STAT_FIRE(trk_index(t), h->hand);
 }

@@ -48,6 +48,40 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-19: release r0.1.1
+
+- The three 2026-11-18 sections below, built and flashed as one package (FM1-flashes flash 14,
+  md5 19de5c94), run on the FM-1 for a day and released as r0.1.1 with those exact bytes. The
+  firmware's own version string (RUDISEQ_VERSION, MENU > SYSTEM > ABOUT) still reads r0.1 in
+  this build; it is bumped with the next one rather than reflashing an untested image.
+- `docs/QUICK-GUIDE.md`: the RUDI 3 page and the SEQ page cycle; `README.md`: status r0.1.1.
+
+## 2026-11-18: RUDI 3, random notes on the track's scale
+
+- Three track parameters after NTE L: `RNG R`, `RNG L` (0..24 semitones; 114, 115) and `CHG` (%, 116; default 100):
+  with a range, the hand plays a random note of the track's scale (SCL: ROOT, SCALE; CHR = chromatic) between its
+  NTE and NTE + RNG, drawn anew on CHG % of its hits and kept on the rest (`rudi.c` rudi_note, scale_has; `seq.c`
+  declares scale_mask ahead of the include). The engine ids move from 114..121 to 117..124: P_E0 117, P_COUNT 125.
+  Projects and user sounds of before load by count as always (the new three take their defaults, motion ids move
+  with P_E0); MOTION_MAX 114 -> 112 makes room in the fixed project store (4 bytes spare). A new SEQ page, RUDI 3
+  (K4 empty); `ui_help.c`; `web/editor.html` (its table, P_COUNT, P_E0); the tests' pins; `tests/rudi_test.c`: T4.
+
+## 2026-11-18: RUDI 1X .. 4X, the lane's rate
+
+- `params.c`: RUDI (K1 of the RUDI page) is OFF, 1X, 2X, 3X or 4X instead of OFF / ON: the lane steps every 1..4
+  steps of its track (`rudi.c` rudi_step: skip; the hit holds through the skipped steps). 3X on a 1/16 track is the
+  dotted-eighth feel the track's DIV cannot give. Stored values 0 / 1 mean what they did. `ui_graph.c`: the rate in
+  the card's header; `ui_help.c`; `web/editor.html`: the editor's list. `tests/rudi_test.c`: T3 at 3X.
+
+## 2026-11-18: a saved sound carries its rudiment
+
+- `upreset.c` (up_load): a user sound saved while RUDI was on brings the eight lane values (RUDI, RUDMT, NTE R / L,
+  PRB R / L, SMART, FTHR) with it. Before, the lane was `param_kept` on every load, so SAVE on a paradiddle bass
+  stored the lane (the record always held it) but loading the sound left the track's lane as it was: on a fresh
+  track or after power-on the sound came back without its rudiment. A sound saved with RUDI off, and every Felucca
+  record, still leaves the lane alone. `ui.c`: SAVE held (undo) swaps the lane back too (undo.rudi).
+- `tests/rudi_save_test.c`: the project and user-sound round trips of the lane, the undo, STOP TO SAVE.
+
 ## 2026-11-12: the splash
 
 - `firmware/src/ui_draw.c` draw_splash: a new power-on screen in the web app's colours (a paradiddle in the two hands'

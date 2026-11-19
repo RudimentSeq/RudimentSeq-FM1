@@ -403,7 +403,11 @@ static void graph_rudi(const track_t *t, uint16_t c)
         b[0] = '#';
         fmt_int(b + 1, rd->id);
         x = cv_text(10, 2, &AF_S, b, T_MID);
-        cv_text(x + 6, 2, &AF_S, CATS[rd->cat % NUM_CATS], T_MID);
+        x = cv_text(x + 6, 2, &AF_S, CATS[rd->cat % NUM_CATS], T_MID);
+        if (t->p[P_RUDION] > 1) {                    /* 2X..4X: the lane's rate, a hit every 2..4 track steps */
+            b[0] = (char)('0' + t->p[P_RUDION]); b[1] = 'X'; b[2] = 0;
+            cv_text(x + 6, 2, &AF_S, b, T_ACCENT);
+        }
     } else {
         cv_text(10, 2, &AF_S, "RUDI OFF  [K1] PLAYS IT", T_MID);
     }

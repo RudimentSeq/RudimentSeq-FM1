@@ -6894,6 +6894,8 @@ static int test_seq_tools(void)
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "RUDI 2");
     press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "RUDI 3");          /* (2026-11-18) */
+    press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "DETAIL") && cur_page()->graph == GR_ROLL;
     press(B_SEQ); frames(320);
     ok &= cur_page()->graph == GR_EVENTS && str_eq(cur_page()->title, "AUTOMATION");
@@ -7248,6 +7250,8 @@ static int test_layer_lock(void)
     ok &= str_eq(cur_page()->title, "RUDI") && !ui.lock && !ui.layer;   /* (1.8: STEP -> RUDI) */
     press(B_SEQ); frames(400);
     ok &= str_eq(cur_page()->title, "RUDI 2") && !ui.lock && !ui.layer;
+    press(B_SEQ); frames(400);
+    ok &= str_eq(cur_page()->title, "RUDI 3") && !ui.lock && !ui.layer;   /* (2026-11-18) */
     press(B_SEQ);                                        /* -> DETAIL */
     btn_down(B_SEQ); frames(500);
     ok &= ui.layer == LAYER_SEQ && !ui.lock;

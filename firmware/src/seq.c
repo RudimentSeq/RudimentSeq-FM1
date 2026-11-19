@@ -66,6 +66,7 @@ static uint32_t trk_index(const track_t *t) { return (uint32_t)(t - trk); }
 static void seq_note_on(track_t *t, uint32_t note, uint32_t vel);
 static void seq_note_off(track_t *t, uint32_t note);
 
+static uint32_t scale_mask(const track_t *t);   /* (below; rudi.c RUDI 3 draws its random notes on the track's scale) */
 #include "rudi.c"                /* RudimentSeq: a track in rudi mode plays a rudiment instead of its pattern */
 
 /* MENU > MIDI > MIDI IN (G_ROUTE, up to 1.1.5 GLO > SYSTEM ROUT): the first channel (0..15) of the block of four that

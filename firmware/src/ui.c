@@ -877,6 +877,7 @@ static struct {
     uint8_t trk;                 /* track + 1, 0 = nothing to undo */
     uint8_t keep;                /* the track is as the last load left it (undo.after): a next load keeps the copy */
     uint8_t what;                /* UNDO_SOUND | UNDO_PAT: what the loads since the copy changed (undo_swap) */
+    uint8_t rudi;                /* RudiSeq: a user sound saved with RUDI on set the lane (upreset.c up_load): it swaps too */
     uint8_t eng, preset, user, patn;
     uint8_t fm6_slot;            /* the track's FM6 patch and its SLOT (eng_fm6.c): an edited or a project's */
     uint8_t fm6[FP_SIZE + 1u];   /* patch is the track's own, not a factory one */
@@ -1000,6 +1001,7 @@ static void load_begin(track_t *t, uint32_t what)
     }
     undo.trk = (uint8_t)(i + 1u);
     undo.what = (uint8_t)what;
+    undo.rudi = 0;
     undo.eng = t->eng_req;
     undo.preset = t->preset;
     undo.user = t->user;
@@ -1058,6 +1060,7 @@ static void edit_undo_take(track_t *t, uint32_t tag, uint32_t what)
     undo_mot_tag = tag;
     undo.trk = (uint8_t)(i + 1u);
     undo.what = (uint8_t)what;
+    undo.rudi = 0;
     undo.eng = t->eng_req;
     undo.preset = t->preset;
     undo.user = t->user;
@@ -1117,7 +1120,7 @@ static void undo_swap(void)
         undo.preset = pr;
         undo.user = u;
         for (i = 0; i < P_COUNT; i++)
-            if (!param_kept(i)) {
+            if (!param_kept(i) || (undo.rudi && i >= P_RUDION && i < P_E0)) {   /* (RudiSeq: a lane a sound set) */
                 int16_t v = t->p[i];
                 t->p[i] = undo.p[i];
                 undo.p[i] = v;

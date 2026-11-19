@@ -118,6 +118,8 @@ enum {                          /* per-track parameters */
     P_ATSNS, P_ATDST, P_ATAMT,                 /* 1.8: AFTERTOUCH: the keys' pressure (keytouch.c) and its routing (mod.c) */
     P_RUDION, P_RUDI, P_RUDPR, P_RUDPL,        /* RudiSeq (rudi.c): rudi mode, the rudiment, R / L hand probability */
     P_RUDSMA, P_RUDFEA, P_RUDNR, P_RUDNL,      /* .. Smart Prob, feather (ghost notes), the hands' notes */
+    P_RUDRR, P_RUDRL, P_RUDCHG,                /* RudiSeq 2026-11-18 (RUDI 3): each hand's random range above its note, in
+                                                * semitones on the track's scale (0: the note itself), CHG: % of hits that pick anew */
     P_E0, P_E1, P_E2, P_E3, P_E4, P_E5, P_E6, P_E7,
     P_COUNT
 };
@@ -269,8 +271,9 @@ static void step_set_nudge(step_t *s, int32_t v)
     uint32_t u = (uint32_t)(v < -8 ? -8 : v > 7 ? 7 : v) & 15u;
     s->flags = (uint8_t)((s->flags & ~SF_NUDGE) | (u & 7u) << 5 | (u >> 1 & 4u));
 }
-#define MOTION_MAX 114u          /* 1.2 (FUN10): 64 before, 128 in 1.2..1.8; 1.8 trimmed to 114 so the saved
-                                  * project store has room for the eight rudiment parameters (still ~1.8x the 1.1 limit) */
+#define MOTION_MAX 112u          /* 1.2 (FUN10): 64 before, 128 in 1.2..1.8; 1.8 trimmed to 114 so the saved
+                                  * project store has room for the eight rudiment parameters (still ~1.8x the 1.1 limit);
+                                  * 112 since RUDI 3's three (RNG R, RNG L, CHG), 4 bytes to spare */
 /* Four tracks x64 steps fit one byte. Values retain their signed parameter range (-64..127: an int8_t, 1.2).
  * param: the P_* id (< 128: P_COUNT is at most 127, project.c), bit 7 (MOTION_LOCK, 1.1) a parameter lock: the value
  * sounds on that step only and goes back after it (motion.c motion_step); without it an automation event, the
@@ -279,7 +282,7 @@ static void step_set_nudge(step_t *s, int32_t v)
 #define MOTION_ID(e) ((uint32_t)(e)->param & 0x7Fu)
 typedef struct { uint8_t place, param; int8_t value; } motion_event_t;
 typedef struct { uint8_t count, on, rsv[2]; motion_event_t event[MOTION_MAX]; } motion_store_t;
-_Static_assert(sizeof(motion_store_t) == 346u, "motion disk layout (FUN10)");
+_Static_assert(sizeof(motion_store_t) == 340u, "motion disk layout (FUN10; 346 with MOTION_MAX 114, 388 with 128)");
 #define CHAIN_ROWS 16u
 /* A song section (1.2, FUN10): the PROJECT slot each track plays (0..3, A..D; CHAIN_SILENT "-": that track plays
  * nothing there) and its repeats (1..16). Up to 1.1 a row was {slot, repeat}, all four tracks on that slot
@@ -361,9 +364,10 @@ typedef struct track {
     uint8_t lfo_wrap;            /* the LFO's phase wrapped this block: its S&H is drawn after the parts (voice.c) */
     uint32_t esync_k[3];         /* ATK's step, DEC's and REL's coefficient (Q16) this block (voice.c esync_coef) */
     uint8_t spread_on;           /* SPREAD this block (fx.c mix_part, voice.c track_render) */
-    uint8_t rsv_sz[15];          /* (sizeof(track_t) a multiple of 16: below; 1.8's AFTERTOUCH grew it by 14) */
+    uint8_t rsv_sz[5];          /* (sizeof(track_t) a multiple of 16: below; 1.8's AFTERTOUCH grew it by 14, RUDI 3's three
+                                 * parameters took 10 of it) */
 #else
-    uint8_t rsv_sz[12];          /* (sizeof(track_t) a multiple of 16: below; 1.8's AFTERTOUCH took 2 of it) */
+    uint8_t rsv_sz[4];           /* (sizeof(track_t) a multiple of 16: below; 1.8's AFTERTOUCH took 2 of it, RUDI 3's three parameters 8) */
 #endif
     int16_t armp, aholdp;        /* P_AMODE / P_AHOLD as last seen by the ISR */
     /* engine switch (voice.c engine_block): the old engine's voices fade out, then it switches */

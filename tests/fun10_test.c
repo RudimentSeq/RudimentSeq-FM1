@@ -712,7 +712,7 @@ static int midi_track_fmt(void)
     memset(song.mch, 0, sizeof song.mch);
     song.g[G_ROUTE] = 0;
     project_capture(&a);
-    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 14u;
+    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 8u;
     for (i = end; i < PROJ_FM6_OFF; i++)
         ok &= st.raw[i] == 0u;
     ok &= proj_import(&b, &st, sizeof st) && !memcmp(&a, &b, sizeof a) && !b.mch[0] && !b.mch[3] && !b.g[G_ROUTE];

@@ -106,6 +106,8 @@ static int page_cycle(void)
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "RUDI 2") && cur_page()->graph == GR_RUDI;
     press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "RUDI 3") && cur_page()->graph == GR_RUDI;   /* (2026-11-18) */
+    press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "DETAIL") && detail_on() && cur_page()->graph == GR_ROLL && ui.cursor == 4u &&
           song.seq_mode;
     press(B_SEQ); frames(320);
@@ -117,10 +119,10 @@ static int page_cycle(void)
     {
         char ti[20];
         page_title(ti);
-        ok = str_eq(ti, "DETAIL 4/5");
+        ok = str_eq(ti, "DETAIL 5/6");   /* (2026-11-18: RUDI 3 before it) */
     }
     ok &= help_page() && str_eq(help_page(), "[PRESETS]STEP[K1]CHANCE, 1:4, FILL");
-    bad += check("  its footer title DETAIL 4/5 (not the scale), its HELP hint", ok);
+    bad += check("  its footer title DETAIL 5/6 (not the scale), its HELP hint", ok);
     return bad;
 }
 

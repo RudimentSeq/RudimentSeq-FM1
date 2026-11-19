@@ -13,7 +13,7 @@ rewritten in C for a 30-dollar synth.
 ## What a rudiment lane does
 
 Turn **RUDI** on for a track (SEQ, second page) and the track stops reading its 16 steps. At every
-step it plays the next hit of the chosen rudiment instead: right hand on one note, left hand on
+step (or every 2nd, 3rd or 4th step: RUDI 1X to 4X) it plays the next hit of the chosen rudiment instead: right hand on one note, left hand on
 another, with the accents, ghosts and grace notes of the real sticking.
 
 - **174 rudiments**: the 40 PAS standard rudiments and the extended set of the web app, from a
@@ -21,13 +21,16 @@ another, with the accents, ghosts and grace notes of the real sticking.
 - **Hand notes** (NTE R / NTE L): any two notes of the DRUM kit, or of any engine, or two notes on
   external gear over USB MIDI.
 - **Hand probability** (PRB R / PRB L): thin out one hand to open up the groove.
+- **Random notes on the scale** (RUDI 3: RNG R / RNG L, CHG): a hand wanders over up to two octaves above
+  its note, on the track's SCL scale, picking anew on CHG % of its hits. A bass that walks, a kit that roams.
 - **SMART**: a 128-step cycle of scenes that raises and lowers the density on its own.
 - **FTHR**: feathering, the ghost notes get quieter the higher it goes.
 - **Four lanes**: each of the four tracks has its own rudiment, notes and settings. Two lanes on two
   kits, a paradiddle on a bass line, a roll on the hats: rudiments are a rhythm distributor, not only
   a drum exercise.
 
-Rudiment settings save with the project and come back at power-on.
+Rudiment settings save with the project and come back at power-on. A sound saved with SAVE while RUDI is on
+(a named user sound) carries its rudiment too: load it on any track and the lane comes back with it.
 
 ## MIDI out (new in this firmware)
 
@@ -54,7 +57,7 @@ Felucca's installer and web editor work with a RudimentSeq device: they accept b
 
 ## Status
 
-r0.1, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
+r0.1.1, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
 The host test suite runs green but for one upstream text-spacing check. Please report problems in
 the issues of this repository (https://github.com/RudimentSeq/RudimentSeq-FM1), not to Felucca's author. Contact: jem@rudimentseq.com.
 

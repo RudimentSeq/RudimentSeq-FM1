@@ -12,6 +12,7 @@ static const char *const N_LPOL[] = {"BI", "UNI"};
 static const char *const N_AMODE[] = {"OFF", "UP", "DN", "UPDN", "RND", "ORD", "REPEAT",   /* (append-only: seq.c AM_*) */
                                        "DNUP", "UP+8", "CONV", "DIVG", "PINKY", "THUMB", "WALK", "CHORD"};
 static const char *const N_DIV[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"};
+static const char *const N_RUDI[] = {"OFF", "1X", "2X", "3X", "4X"};   /* RudiSeq: the lane off, or a hit every 1..4 steps of its track */
 /* the delay's TIME (G_DTIME): N_DIV's ten (their values kept), then 1.5.1's dotted ones appended (stored values:
  * append-only). A list of its own: ARP RATE, SEQ DIV and LFO SYNC keep N_DIV's ten (fx.c delay_samples) */
 static const char *const N_DTIME[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR",
@@ -180,7 +181,8 @@ static const param_desc_t TP[P_COUNT] = {
     [P_ATAMT] = PD("ATAMT", F_BIPCT, -64, 63, 0),
     /* RudiSeq (rudi.c): ON = the track plays RUDMT's rudiment instead of its pattern. The rudiment's
      * name, sticking and playhead are the RUDI pages' graph (ui_graph.c GR_RUDI) */
-    [P_RUDION] = PE("RUDI", N_ONOFF, 0),   /* default OFF (a fresh track plays its pattern); once ON it survives sound changes (param_kept) */
+    [P_RUDION] = PE("RUDI", N_RUDI, 0),    /* default OFF (a fresh track plays its pattern); 1X..4X (2026-11-18): the lane steps every
+                                            * 1..4 track steps, so 3X on 1/16 is the dotted-eighth lope; once on it survives sound changes (param_kept) */
     [P_RUDI] = PD("RUDMT", F_INT, 0, NUM_RUDIMENTS - 1, 15),   /* 15: Single Paradiddle */
     [P_RUDPR] = PD("PRB R", F_PCT, 0, 100, 100),
     [P_RUDPL] = PD("PRB L", F_PCT, 0, 100, 100),
@@ -188,6 +190,10 @@ static const param_desc_t TP[P_COUNT] = {
     [P_RUDFEA] = PD("FTHR", F_PCT, 0, 100, 0),
     [P_RUDNR] = PD("NTE R", F_INT, 0, 127, 38),   /* DRUM: snare */
     [P_RUDNL] = PD("NTE L", F_INT, 0, 127, 37),   /* DRUM: rim */
+    [P_RUDRR] = PD("RNG R", F_INT, 0, 24, 0),     /* RUDI 3 (2026-11-18): the hand plays a random note of the track's scale
+                                                   * between NTE and NTE + RNG semitones (0: NTE itself) */
+    [P_RUDRL] = PD("RNG L", F_INT, 0, 24, 0),
+    [P_RUDCHG] = PD("CHG", F_PCT, 0, 100, 100),   /* .. and picks a new one on this % of its hits (else keeps the last) */
 };
 
 /* the INSERT's A B C as its TYPE means them (TP's ranges and defaults): the drives DRIVE TONE LEVEL, CRUSH BITS RATE
@@ -528,6 +534,8 @@ static const page_t PAGES[] = {
                                                                              * a bass or melody line wants first); the hand
                                                                              * probabilities moved to RUDI 2 */
     {"RUDI 2", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDSMA, P_RUDFEA, P_RUDPR, P_RUDPL}},
+    {"RUDI 3", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDRR, P_RUDRL, P_RUDCHG, 0xFF}},   /* 2026-11-18: the hands' random range on the
+                                                                             * track's scale, how often a hit picks anew */
     {"DETAIL", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},   /* 1.5.1 (#199): the cursor step's CHANCE RATCH NUDGE VEL
                                                              * (ui.c detail_on, ui_input.c sd_turn) */
     {"AUTOMATION", FAM_SEQ, SC_TRACK, GR_EVENTS, {0xFF, 0xFF, 0xFF, 0xFF}},  /* the locks, events, CHANCE and RATCH as a

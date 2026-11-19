@@ -451,24 +451,30 @@ static int up_rename(uint32_t k, const char *name) { return up_rename_cat(k, nam
 
 /* slot k -> the selected part's sound: engine and every parameter except the track's own (param_kept:
  * the mix, ARP, SCL, the pattern parameters, the SLICER). The steps stay: the record's pattern is
- * loaded only from SAVE > PHRASES (up_pat_load). 0 ok, 1 empty */
+ * loaded only from SAVE > PHRASES (up_pat_load). 0 ok, 1 empty.
+ * RudiSeq: the rudiment lane is the one exception: a sound saved while RUDI was on carries its lane (RUDI, the
+ * rudiment, the hands' notes and probabilities, SMART, FTHR), so SAVE on a paradiddle bass gives it back whole */
 static int up_load(uint32_t k)
 {
     const up_rec_t *r;
     int16_t v[P_COUNT];
-    uint32_t i;
+    uint32_t i, with_rudi;
     track_t *t = TSEL;
     if (!up_used(k))
         return 1;
     r = up_rec(k);
     up_values(r, v);
+    with_rudi = v[P_RUDION] != 0;                       /* RudiSeq: a sound saved with RUDI on brings its rudiment
+                                                         * (the eight P_RUD* values) with it; one saved with RUDI off,
+                                                         * and every Felucca record, leaves the track's lane alone */
     load_begin(t, UNDO_SOUND);                          /* (ui.c: the copy for SAVE held = undo) */
+    undo.rudi |= (uint8_t)with_rudi;                    /* (ui.c undo_swap: the lane swaps back too) */
     panic_req |= (uint8_t)(1u << song.sel);
 #if !FELUCCA_FM4
     if (r->engine == ENGI_DIGITAL) {                    /* a DIGITAL sound (kept as it was stored): FM6 */
         int16_t p[P_COUNT];
         for (i = 0; i < P_COUNT; i++)
-            p[i] = param_kept(i) ? t->p[i] : v[i];
+            p[i] = param_kept(i) && !(with_rudi && i >= P_RUDION && i < P_E0) ? t->p[i] : v[i];
         fm4_apply(t, p);
     } else
 #endif
@@ -476,7 +482,7 @@ static int up_load(uint32_t k)
         fm1_irq_off();                                  /* the audio ISR must not see half a sound */
         t->eng_req = r->engine;
         for (i = 0; i < P_COUNT; i++)
-            if (!param_kept(i))
+            if (!param_kept(i) || (with_rudi && i >= P_RUDION && i < P_E0))
                 t->p[i] = v[i];
         t->preset = 0;
         fm1_irq_on();
