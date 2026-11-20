@@ -1126,6 +1126,12 @@ static void undo_swap(void)
                 undo.p[i] = v;
             }
     }
+    if ((undo.what & (UNDO_PAT | UNDO_SOUND)) == UNDO_PAT && undo.rudi)   /* RudiSeq PRINT: the lane back too */
+        for (i = P_RUDION; i < P_E0; i++) {
+            int16_t v = t->p[i];
+            t->p[i] = undo.p[i];
+            undo.p[i] = v;
+        }
     if (undo.what & UNDO_PAT) {
         uint32_t ps = pat_sig[trk_index(t)];
         uint8_t pn = pat_last[trk_index(t)];

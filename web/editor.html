@@ -802,7 +802,9 @@ function fmtValue(d, v) {
     case F.NOTE: return [NOTE_NAMES[((v % 12) + 12) % 12], ""];
     case F.ONOFF: return [v ? "ON" : "OFF", ""];
     case F.STEPS: return [String(v), "STEP"];
-    default: return [String(v), d.unit || ""];
+    default:
+      if (d.label === "NTE R" || d.label === "NTE L") return [NOTE_NAMES[((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1), ""];   /* RudiSeq: the hand's note by name (D2 = 38) */
+      return [String(v), d.unit || ""];
   }
 }
 

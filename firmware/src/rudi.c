@@ -88,6 +88,29 @@ static uint32_t rudi_note(track_t *t, rudi_lane_t *r, uint32_t hand)
     return k;
 }
 
+/* the hit's chance: PRB of its hand, scaled by SMART's scene at smart step ss; 1 = it plays (the lane's dice) */
+static int rudi_fires(const track_t *t, rudi_lane_t *r, const rudi_hit_t *h, uint32_t ss)
+{
+    uint32_t p = (uint32_t)(h->hand ? t->p[P_RUDPL] : t->p[P_RUDPR]);
+    if (t->p[P_RUDSMA])
+        p = p * rudi_smart[h->hand ? 1 : 0][ss] / 100u;
+    return !(p < 100u && rudi_rand100(r) >= p);
+}
+
+/* the web app's velocity model (0..127): 90; an accent 108 (90 + (115 - 90) x 90 / 127); feathered toward 20; a
+ * grace 30 */
+static uint32_t rudi_vel(const track_t *t, const rudi_hit_t *h)
+{
+    uint32_t vel = 90, feather = (uint32_t)t->p[P_RUDFEA];
+    if (h->accent)
+        vel = 108;
+    else if (feather)
+        vel = 90u - (90u - 20u) * feather / 100u;
+    if (h->grace)
+        vel = 30;
+    return vel;
+}
+
 static void rudi_hush(track_t *t)                  /* the held note off (stop, mode off) */
 {
     rudi_lane_t *r = &rudi[trk_index(t)];
@@ -135,7 +158,7 @@ static __attribute__((noinline)) void rudi_step(track_t *t)
     uint32_t rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
     const rudiment_t *rd = &RUDIMENTS[rud];
     const rudi_hit_t *h;
-    uint32_t ss = r->sstep, p, vel, note, feather, every = (uint32_t)t->p[P_RUDION];
+    uint32_t ss = r->sstep, note, every = (uint32_t)t->p[P_RUDION];
     /* RUDI 2X..4X: the lane steps every 2..4 track steps; between them the last hit keeps sounding (its gate is
      * one lane step) */
     if (r->skip) {
@@ -154,21 +177,10 @@ static __attribute__((noinline)) void rudi_step(track_t *t)
     rudi_hush(t);                                  /* the last hit's gate: one step */
     if (h->hand < 0)
         return;                                    /* a rest */
-    p = (uint32_t)(h->hand ? t->p[P_RUDPL] : t->p[P_RUDPR]);
-    if (t->p[P_RUDSMA])
-        p = p * rudi_smart[h->hand ? 1 : 0][ss] / 100u;
-    if (p < 100u && rudi_rand100(r) >= p)
+    if (!rudi_fires(t, r, h, ss))
         return;                                    /* rolled out */
-    vel = 90;                                      /* the web app's velocity model (0..127) */
-    feather = (uint32_t)t->p[P_RUDFEA];
-    if (h->accent)
-        vel = 108;                                 /* 90 + (115 - 90) x 90 / 127 */
-    else if (feather)
-        vel = 90u - (90u - 20u) * feather / 100u;
-    if (h->grace)
-        vel = 30;
     note = rudi_note(t, r, h->hand ? 1u : 0u);     /* NTE, or RUDI 3's random note of the scale */
-    seq_note_on(t, note, vel);                     /* the voice and MIDI OUT (seq.c) */
+    seq_note_on(t, note, rudi_vel(t, h));          /* the voice and MIDI OUT (seq.c) */
     RUDI_STAT_NOTE(trk_index(t), h->hand, note);
     r->sounding = (uint8_t)(note + 1u);
     RUDI_STAT_FIRE(trk_index(t), h->hand);

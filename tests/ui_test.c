@@ -10050,6 +10050,86 @@ static int test_ux18(void)
     return bad;
 }
 
+
+/* RudiSeq PRINT (2026-11-19): SEQ TOOLS' E4 while RUDI is on writes the lane into the track's steps (LEN of them,
+ * from the top of the sticking; 2X..4X: TIEs through the skipped steps; RUDI 3's notes as they fall) and turns RUDI
+ * off, so the track plays the print. With RUDI off the key stays BEAT's (DRUM only). */
+static int test_rudi_print(void)
+{
+    int bad = 0, ok;
+    uint32_t i, distinct = 0, seen = 0;
+    const rudiment_t *rd = &RUDIMENTS[15];        /* Single Paradiddle: R L R R L R L L, 8 hits */
+    ui_power_on();
+    tl_melody();
+    TSEL->p[P_SLEN] = 16;
+    go_page(GR_ROLL); frame();
+    btn_down(B_SEQ); frames(500);
+    ok = ui.layer == LAYER_SEQ && !tl_cell(TSEL, TL_BEAT) && rd->nHits == 8u && str_eq(rd->sname, "SGL PDL");
+    tl_key(6);                                    /* E4 on a melodic track with RUDI off: nothing */
+    ok &= TSEL->step[0].note[0] == 60 && TSEL->step[1].time == ST_TIE && TSEL->step[3].note[0] == 64;
+    bad += check("PRINT: E4 does nothing on a melodic track while RUDI is off (BEAT is DRUM's key)", ok);
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 15;
+    TSEL->p[P_RUDPR] = TSEL->p[P_RUDPL] = 100; TSEL->p[P_RUDSMA] = 0; TSEL->p[P_RUDFEA] = 0;
+    TSEL->p[P_RUDNR] = 60; TSEL->p[P_RUDNL] = 48; TSEL->p[P_RUDRR] = TSEL->p[P_RUDRL] = 0;
+    frame();
+    ok = tl_cell(TSEL, TL_BEAT);
+    tl_key(6);
+    ok &= TSEL->p[P_RUDION] == 0 && msg_is("PRINTED 16 HITS");
+    for (i = 0; i < 16; i++) {
+        const step_t *s = &TSEL->step[i];
+        const rudi_hit_t *h = &rd->hits[i % 8u];
+        ok &= s->time == ST_NOTE && s->n == 1 && s->note[0] == (h->hand ? 48 : 60) && s->probability == 0 &&
+              s->vel == (h->accent ? 108 : 90) && ((s->flags & SF_ACCENT) != 0) == (h->accent != 0);
+    }
+    ok &= TSEL->step[20].note[0] == 72;           /* past LEN: untouched */
+    bad += check("PRINT at 1X: 16 NOTE steps, R 60 / L 48 as the sticking, accents kept, RUDI OFF, past LEN untouched", ok);
+    btn_up(B_SEQ); frame();
+    TSEL->p[P_RUDION] = 2; frame();
+    btn_down(B_SEQ); frames(500);
+    tl_key(6);
+    ok = TSEL->p[P_RUDION] == 0 && msg_is("PRINTED 8 HITS");
+    for (i = 0; i < 16; i++) {
+        const step_t *s = &TSEL->step[i];
+        ok &= (i & 1u) ? s->time == ST_TIE && s->n == 0
+                       : s->time == ST_NOTE && s->note[0] == (rd->hits[(i / 2u) % 8u].hand ? 48 : 60);
+    }
+    bad += check("PRINT at 2X: 8 hits, each held by a TIE through the skipped step", ok);
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDRR] = 12; TSEL->p[P_RUDRL] = 0; TSEL->p[P_RUDCHG] = 100;
+    TSEL->p[P_ROOT] = 0; TSEL->p[P_SCALE] = 1;    /* C MAJ */
+    frame();
+    tl_key(6);
+    ok = TSEL->p[P_RUDION] == 0 && msg_is("PRINTED 16 HITS");
+    for (i = 0; i < 16; i++) {
+        uint32_t n = TSEL->step[i].note[0];
+        if (rd->hits[i % 8u].hand) {
+            ok &= n == 48;
+        } else {
+            ok &= n >= 60 && n <= 72 && ((0xAB5u >> (n % 12u)) & 1u);
+            if (!((seen >> (n - 60)) & 1u)) {
+                seen |= 1u << (n - 60);
+                distinct++;
+            }
+        }
+    }
+    ok &= distinct >= 3;
+    bad += check("PRINT with RUDI 3: the R hand's notes on C MAJ inside 60..72 (3+ distinct), L fixed, nothing off the scale", ok);
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDRR] = 0; TSEL->p[P_RUDPR] = 100; TSEL->p[P_RUDPL] = 0;   /* L never */
+    frame();
+    tl_key(6);
+    ok = TSEL->p[P_RUDION] == 0 && msg_is("PRINTED 8 HITS");
+    for (i = 0; i < 16; i++)
+        ok &= rd->hits[i % 8u].hand ? TSEL->step[i].time == ST_REST && TSEL->step[i].n == 0 : TSEL->step[i].note[0] == 60;
+    bad += check("PRINT with PRB L 0: the L hand's steps are rests, the R hand's notes", ok);
+    btn_up(B_SEQ); frame();
+    hold(B_SAVE);                                 /* the tools' undo: the steps and the lane back */
+    ok = TSEL->p[P_RUDION] == 1 && TSEL->p[P_RUDPL] == 0 && TSEL->step[1].time == ST_NOTE && TSEL->step[1].note[0] == 48;
+    bad += check("PRINT: SAVE held undoes it: the steps before it and RUDI ON again", ok);
+    hold(B_SAVE);                                 /* redo: the print again, RUDI off */
+    ok = TSEL->p[P_RUDION] == 0 && TSEL->step[1].time == ST_REST;
+    bad += check("PRINT: SAVE held again redoes it", ok);
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -10087,6 +10167,7 @@ int main(void)
     bad += test_soak_cards();
     bad += test_panel();
     bad += test_layer();
+    bad += test_rudi_print();
     bad += test_layer_knob_leak();
     bad += test_layer_knob_race();
     bad += test_fx_latch();

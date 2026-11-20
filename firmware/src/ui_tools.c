@@ -25,7 +25,62 @@ static uint32_t tl_lane(const step_t *s, uint32_t l) { return (step_lanes(s) >> 
 /* place p's action is there for this track (the lane row and BEAT: DRUM only) */
 static int tl_cell(const track_t *t, uint32_t p)
 {
-    return p < TL_N && (p < TL_BEAT || p == TL_EUCLID || p >= TL_DOUBLE || drum_track(t));
+    return p < TL_N && (p < TL_BEAT || p == TL_EUCLID || p >= TL_DOUBLE || drum_track(t) ||
+                        (p == TL_BEAT && t->p[P_RUDION]));   /* RudiSeq: E4 is PRINT while RUDI is on */
+}
+static int tl_print_key(const track_t *t, uint32_t p) { return p == TL_BEAT && t->p[P_RUDION] != 0; }
+
+/* RudiSeq PRINT (2026-11-19): SEQ TOOLS' E4 while RUDI is on (BEAT's key: a basic beat is no use under a rudiment).
+ * The lane's next LEN steps become the track's steps, from the top of the sticking: the rate (2X..4X: the hit, then
+ * TIEs through the skipped steps), PRB and SMART rolled with the lane's own dice, the velocity model (an accent as a
+ * step accent), RUDI 3's notes as they fall; nothing sounds. Then RUDI OFF: the track plays the print, which takes
+ * every step tool and the undo. Returns the hits written; the lane's dice move on (another PRINT, another roll). */
+static uint32_t tl_print(track_t *t, uint32_t len)
+{
+    rudi_lane_t *live = &rudi[trk_index(t)], sim;
+    const rudiment_t *rd = &RUDIMENTS[(uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS];
+    uint32_t i, hits = 0, held = 0, every = (uint32_t)t->p[P_RUDION];
+    int drum = drum_track(t);
+    if (!rudi_ready)
+        rudi_init();
+    sim = *live;
+    sim.hit = 0;
+    sim.sstep = 0;
+    sim.skip = 0;
+    sim.cur[0] = sim.cur[1] = 0;
+    for (i = 0; i < len; i++) {
+        step_t *s = &t->step[i];
+        const rudi_hit_t *h;
+        uint32_t ss = sim.sstep;
+        step_clear(s);
+        if (sim.skip) {                                 /* 2X..4X: the hit holds through the skipped steps */
+            sim.skip--;
+            if (held && !drum)
+                s->time = ST_TIE;
+            continue;
+        }
+        sim.skip = (uint8_t)(every > 1u ? every - 1u : 0u);
+        h = &rd->hits[sim.hit % rd->nHits];
+        sim.hit = (uint8_t)((sim.hit + 1u) % rd->nHits);
+        sim.sstep = (uint8_t)((sim.sstep + 1u) & 127u);
+        held = 0;
+        if (h->hand < 0 || !rudi_fires(t, &sim, h, ss))
+            continue;                                   /* a rest, or rolled out */
+        s->time = ST_NOTE;
+        s->n = 1;
+        s->note[0] = (uint8_t)rudi_note(t, &sim, h->hand ? 1u : 0u);
+        s->vel = (uint8_t)rudi_vel(t, h);
+        if (h->accent)
+            s->flags |= SF_ACCENT;
+        if (drum)
+            step_to_grid(s);                            /* NTE on a lane's note: that lane's hit */
+        held = 1;
+        hits++;
+    }
+    live->rng = sim.rng;
+    rudi_hush(t);                                       /* the lane's held note off; the print plays from here */
+    t->p[P_RUDION] = 0;
+    return hits;
 }
 
 /* the undo copy of t as it is now (ui.c load_begin, but the automation is copied and stays): one action */
@@ -34,6 +89,7 @@ static void tl_undo_take(track_t *t)
     uint32_t i = trk_index(t);
     undo.trk = (uint8_t)(i + 1u);
     undo.what = UNDO_PAT;
+    undo.rudi = 0;                                      /* (RudiSeq: PRINT sets it, its undo brings the lane back) */
     undo.keep = 0;                                      /* (the next load or action takes its own copy) */
     undo.eng = t->eng_req;
     undo.preset = t->preset;
@@ -551,6 +607,7 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
 {
     static char b[24];
     uint32_t len = tl_len(t), i, n = 0;
+    int print = tl_print_key(t, p);
     uint64_t was = tl_used(t, len);
     int drum = drum_track(t);
     const char *msg = 0;
@@ -601,6 +658,14 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
         str_cpy(b + str_len(b), " STEPS", sizeof b - str_len(b));
         return b;                                       /* (nothing emptied inside the new LEN: no unlock) */
     case TL_BEAT:                                       /* four on the floor, the backbeat, 8th hats */
+        if (print) {                                    /* RudiSeq: PRINT (the key doubles while RUDI is on) */
+            undo.rudi = 1;                              /* SAVE held: the steps and RUDI ON back */
+            str_cpy(b, "PRINTED ", sizeof b);
+            fmt_int(b + str_len(b), (int32_t)tl_print(t, len));
+            str_cpy(b + str_len(b), " HITS", sizeof b - str_len(b));
+            msg = b;
+            break;
+        }
         for (i = 0; i < len; i++) {
             step_clear(&t->step[i]);
             if (i % 4u == 0u) grid_hit(t, i, DV_KICK, 1);

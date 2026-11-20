@@ -362,6 +362,13 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
         fmt_named = 1;
         return;
     }
+    if (d == &TP[P_RUDNR] || d == &TP[P_RUDNL]) {   /* RudiSeq (2026-11-19): the hand's note by name, D2 for 38 (the
+                                                     * DRUM kit's snare), as the keys and the step editor name them */
+        str_cpy(val, N_NOTE[(uint32_t)v % 12u], 4);
+        fmt_int(val + str_len(val), v / 12 - 1);
+        fmt_named = 1;
+        return;
+    }
     switch (d->fmt) {
     case F_PCT:                                     /* a 0..100 range (SWG) is its value, others a share of 127 */
         fmt_int(val, d->max == 100 ? v : (v * 100 + 63) / 127);

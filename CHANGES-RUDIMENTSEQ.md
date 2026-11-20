@@ -48,6 +48,18 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-20: PRINT, and the hands' notes by name (r0.1.3)
+
+- `ui_tools.c` tl_print: SEQ TOOLS' E4 (BEAT's key) is PRINT while the track's RUDI is on: the lane's next
+  LEN steps become the track's steps, from the top of the sticking, with the rate (2X..4X: the hit, then
+  TIEs), PRB and SMART rolled on the lane's own dice, the velocity model (an accent a step accent), RUDI 3's
+  notes as they fall; on a DRUM track the notes on a lane's note become that lane's hits. Then RUDI OFF.
+  "PRINTED n HITS"; SAVE held undoes it and brings the lane back (`ui.c` undo_swap: UNDO_PAT with
+  undo.rudi swaps P_RUDION..P_E0-1 too). `rudi.c`: rudi_fires and rudi_vel, shared with rudi_step.
+- `ui_layer.c`: the cell says PRINT (the steps icon) while RUDI is on; `tests/ui_render.c`: two scenes.
+- `params.c`: NTE R and NTE L show the note by name with its octave (D2 for 38); `web/editor.html` the same.
+- `core.h`: RUDISEQ_VERSION r0.1.3. `tests/ui_test.c`: test_rudi_print (1X, 2X, RUDI 3, PRB 0, undo, redo).
+
 ## 2026-11-19: STOP TO SAVE on the card (r0.1.2)
 
 - `ui.c` act_stop, `ui_draw.c`: when the picked action is a save and the transport runs, the card

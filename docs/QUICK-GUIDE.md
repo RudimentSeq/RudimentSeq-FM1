@@ -1,6 +1,6 @@
 # RudimentSeq on the FM-1: quick guide
 
-Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.2, 2026-11-19.
+Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.3, 2026-11-20.
 
 ![FM-1 controls](controls.jpg)
 
@@ -72,7 +72,7 @@ Black keys F#3 G#3 A#3 C#4: momentary mutes T1 to T4. Hold a white key and turn 
 
 **SEQ held** (SEQ TOOLS, on the selected track; each tool is one undo, OCT− puts the pattern back)
 
-White keys from F3, in order: CLEAR, REVERSE, SHIFT <, SHIFT >, RANDOM, COOK, BEAT (drum), EUCLID, then on a DRUM track the lane's CLR, REV, FILL, RND, then DOUBLE and HALF. KNOB 1 to 4: LEN, DIV, SWING, GATE.
+White keys from F3, in order: CLEAR, REVERSE, SHIFT <, SHIFT >, RANDOM, COOK, BEAT (drum; **PRINT** while RUDI is on), EUCLID, then on a DRUM track the lane's CLR, REV, FILL, RND, then DOUBLE and HALF. KNOB 1 to 4: LEN, DIV, SWING, GATE.
 
 **EDIT held** (the engine)
 
@@ -92,12 +92,13 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 ## RudimentSeq: the rudiment lanes
 
-- **SEQ, tap twice** (STEP then RUDI). KNOB 1 **RUDI** OFF, 1X, 2X, 3X or 4X: the track stops reading its steps and plays the rudiment, a hit every 1 to 4 steps of the track (3X on 1/16 is the dotted-eighth lope; hold SEQ, KNOB 2 for the track's DIV). KNOB 2 **RUDMT** picks one of 174. KNOB 3 **NTE R** and KNOB 4 **NTE L**: the right and left hand's notes (any kit sound, any engine note, or external gear over USB MIDI).
+- **SEQ, tap twice** (STEP then RUDI). KNOB 1 **RUDI** OFF, 1X, 2X, 3X or 4X: the track stops reading its steps and plays the rudiment, a hit every 1 to 4 steps of the track (3X on 1/16 is the dotted-eighth lope; hold SEQ, KNOB 2 for the track's DIV). KNOB 2 **RUDMT** picks one of 174. KNOB 3 **NTE R** and KNOB 4 **NTE L**: the right and left hand's notes, shown by name (D2 is the DRUM kit's snare, 38; any engine note, or external gear over USB MIDI).
 - **Tap SEQ again** for RUDI 2: KNOB 1 **SMART** (a 128-step scene cycle that raises and lowers the density), KNOB 2 **FTHR** (feathering, the ghosts get quieter), KNOB 3 **PRB R**, KNOB 4 **PRB L** (hand probabilities, thin a hand out).
 - **Tap SEQ again** for RUDI 3: KNOB 1 **RNG R** and KNOB 2 **RNG L**, a range in semitones (0 to 24) above the hand's note: the hand plays a random note of the track's scale in that range (SCL page: ROOT and SCALE, CHR for any note). KNOB 3 **CHG** is how often a hit picks a new note: 100 scatters, 20 drifts.
 - Each of the four tracks has its own lane and settings. They save with the project and come back at power-on.
 - **MIDI out** is automatic: the sequencer, the lanes and the arp go out over USB on each track's channel, and no note is ever left hanging.
 - **HOME > CLOCK, KNOB 4 SYNC ON**: MIDI clock, Start and Stop out when the FM-1 is the clock master.
+- **PRINT** (hold SEQ, tap E4 while RUDI is on): the lane's next LEN steps are written into the track's steps, as they would have played (the rate, probabilities, SMART, accents, RUDI 3's notes as they fall), and RUDI goes OFF: the track plays the print, and every step tool works on it. LEN and DIV set the length: 64 steps at 1/16 is 4 bars, at 1/8 8 bars. SAVE held undoes it (RUDI back on); RUDI on again and PRINT again for another roll.
 - **To hear only a rudiment lane**: hold GLO and mute the other tracks on the black keys (or solo its white key), or set MUTE on HOME > MIXER.
 
 ## Saving and loading

@@ -1101,12 +1101,12 @@ static void layer_seq(void)
         if (!tl_cell(TSEL, p))
             continue;
         n[0] = W_NOTE[p];
-        str_cpy(nm, TL_NAME[p], sizeof nm);
+        str_cpy(nm, tl_print_key(TSEL, p) ? "PRINT" : TL_NAME[p], sizeof nm);   /* (RudiSeq: E4 PRINT while RUDI is on) */
         if (p >= TL_LCLR) {                             /* the lane's: "CLR BD" */
             str_cpy(nm + str_len(nm), " ", 2);
             str_cpy(nm + str_len(nm), drum_lane_abbr(TSEL, ui.lane), sizeof nm - str_len(nm));
         }
-        lcell(LC_X(p % 4u), 4 + 32 * (int32_t)(p / 4u), 28, n, TL_ICON[p], 0, nm, st, 0);
+        lcell(LC_X(p % 4u), 4 + 32 * (int32_t)(p / 4u), 28, n, tl_print_key(TSEL, p) ? ICON_STEPS : TL_ICON[p], 0, nm, st, 0);
     }
     for (p = 0; drum && p < NLANE; p++) {               /* the lanes (black keys 1..8): 8 cells of 18 px, 2 px apart */
         int32_t x = 6 + 20 * (int32_t)p;
