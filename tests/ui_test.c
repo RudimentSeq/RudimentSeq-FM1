@@ -8522,17 +8522,21 @@ static int test_style(void)
     hold(B_HOME); ui.menu_sel = MI_STYLE;
     ok &= ui.menu == 1u && str_eq(MI_NAME[MI_STYLE], "STYLE");
     turn(EN_K1, 1); ok &= ui_style == ST_LINE && ux.style == ST_LINE && ux.surf == ux.bg;
-    turn(EN_K1, 1); ok &= ui_style == ST_LINE;
+    turn(EN_K1, 1); ok &= ui_style == ST_MAX && ux.style == ST_FLAT && ux.hi;             /* (RudiSeq: FLAT MAX) */
+    turn(EN_K1, 1); ok &= ui_style == ST_MAX + ST_LINE && ux.style == ST_LINE && ux.hi;   /* (LINE MAX, the end) */
+    turn(EN_K1, 1); ok &= ui_style == ST_MAX + ST_LINE;
+    turn(EN_K1, -1); turn(EN_K1, -1); ok &= ui_style == ST_LINE && !ux.hi;
     turn(EN_K1, -1); ok &= ui_style == ST_FLAT;
     turn(EN_K1, -1); ok &= ui_style == ST_FLAT;
     press(B_OCTUP); ok &= ui_style == ST_LINE && ui.menu == 1u;
-    press(B_OCTUP); ok &= ui_style == ST_LINE;
+    press(B_OCTUP); ok &= ui_style == ST_MAX;
+    press(B_OCTDN); ok &= ui_style == ST_LINE;
     press(B_OCTDN); ok &= ui_style == ST_FLAT && ux.style == ST_FLAT && ux.surf != ux.bg && ui.menu == 1u;
     press(B_OCTUP); ok &= ui_style == ST_LINE;
     ok &= !(ui_prefs & 0xFFu) && settings_leds == LEDS_DIM;   /* (no other setting moved) */
     hold(B_HOME);
     ok &= !ui.menu && ux.style == ST_LINE && host_screen[rule] == swap16(T_RULE);
-    bad += check("MENU > STYLE: FLAT by default, KNOB 1 / OCT-+ FLAT / LINE, LINE drawn (rules, no SURF)", ok);
+    bad += check("MENU > STYLE: FLAT by default, KNOB 1 / OCT-+ FLAT / LINE / FLAT MAX / LINE MAX, LINE drawn (rules, no SURF)", ok);
     {
         persist_t p, q;
         settings_export(&p);
@@ -10130,6 +10134,76 @@ static int test_rudi_print(void)
     return bad;
 }
 
+static void tl_bkey(uint32_t b) { key_down(black(b)); frame(); key_up(black(b)); frame(); }
+static int test_rudi_print_to(void)
+{
+    int bad = 0, ok;
+    uint32_t i;
+    const rudiment_t *rd = &RUDIMENTS[15];        /* Single Paradiddle: R L R R L R L L */
+    track_t *d = &trk[2];
+    ui_power_on();
+    tl_melody();                                  /* T1: the source, its lane on */
+    TSEL->p[P_SLEN] = 16;
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 15;
+    TSEL->p[P_RUDPR] = TSEL->p[P_RUDPL] = 100; TSEL->p[P_RUDSMA] = 0; TSEL->p[P_RUDFEA] = 0;
+    TSEL->p[P_RUDNR] = 60; TSEL->p[P_RUDNL] = 48; TSEL->p[P_RUDRR] = TSEL->p[P_RUDRL] = 0;
+    track_defaults_steps(d);                      /* T3: the destination, LEN 8, a note past LEN, its own RUDI on */
+    for (i = 0; i < NSTEP; i++)
+        step_clear(&d->step[i]);
+    tl_note(&d->step[10], 72);
+    d->p[P_SLEN] = 8;
+    d->p[P_RUDION] = 3;
+    go_page(GR_ROLL); frame();
+    btn_down(B_SEQ); frames(500);
+    ok = ui.layer == LAYER_SEQ && trk_index(TSEL) == 0u;
+    tl_bkey(2);                                   /* black key 3 (A#3): PRINT TO T3 */
+    ok &= msg_is("PRINTED 8 HITS TO T3") && d->p[P_RUDION] == 0 && TSEL->p[P_RUDION] == 1;
+    for (i = 0; i < 8; i++) {
+        const step_t *s = &d->step[i];
+        const rudi_hit_t *h = &rd->hits[i];
+        ok &= s->time == ST_NOTE && s->n == 1 && s->note[0] == (h->hand ? 48 : 60) && s->vel == (h->accent ? 108 : 90);
+    }
+    ok &= d->step[8].time == ST_REST && d->step[10].note[0] == 72;   /* its LEN, not the source's; past it untouched */
+    ok &= TSEL->step[0].note[0] == 60 && TSEL->step[1].time == ST_TIE && TSEL->step[3].note[0] == 64;   /* T1 as it was */
+    bad += check("PRINT TO: black key 3 while RUDI is on prints T1's lane into T3 (its LEN), T3's RUDI off, T1's lane still on", ok);
+    btn_up(B_SEQ); frame();
+    hold(B_SAVE);                                 /* the undo is T3's: its steps and its RUDI 3X back */
+    ok = d->p[P_RUDION] == 3 && d->step[0].time == ST_REST && d->step[10].note[0] == 72 && TSEL->p[P_RUDION] == 1;
+    bad += check("PRINT TO: SAVE held undoes it on the destination track, the source untouched", ok);
+    btn_down(B_SEQ); frames(500);
+    tl_bkey(0);                                   /* black key 1: the selected track itself, as E4 */
+    ok = msg_is("PRINTED 16 HITS") && TSEL->p[P_RUDION] == 0 && TSEL->step[1].time == ST_NOTE && TSEL->step[1].note[0] == 48;
+    bad += check("PRINT TO: black key 1 on track 1 prints into itself, as E4 does", ok);
+    btn_up(B_SEQ); frame();
+    return bad;
+}
+
+static int test_style_max(void)                   /* RudiSeq: STYLE FLAT MAX / LINE MAX */
+{
+    int bad = 0, ok;
+    ui_power_on();
+    ui_style = ST_FLAT; frame();
+    ok = !ux.hi && ux.mid != ux.text && menu_n(MI_STYLE) == 4u && str_eq(menu_vname(MI_STYLE, menu_get(MI_STYLE)), "FLAT");
+    { uint16_t ink; lc_fill(LS_OFF, &ink); ok &= ink == T_THEME; }
+    menu_put(MI_STYLE, 2); frame();
+    { uint16_t ink; lc_fill(LS_OFF, &ink); ok &= ink == T_TEXT; lc_fill(LS_DIM, &ink); ok &= ink == T_DIM; }   /* the layers' cells */
+    ok &= ui_style == ST_MAX && ux.hi && ux.style == ST_FLAT && ux.mid == ux.text && menu_get(MI_STYLE) == 2u &&
+          str_eq(menu_vname(MI_STYLE, menu_get(MI_STYLE)), "FLAT MAX");
+    menu_put(MI_STYLE, 3); frame();
+    ok &= ui_style == ST_MAX + ST_LINE && ux.hi && ux.style == ST_LINE && ux.mid == ux.text && menu_get(MI_STYLE) == 3u &&
+          str_eq(menu_vname(MI_STYLE, menu_get(MI_STYLE)), "LINE MAX");
+    menu_put(MI_STYLE, 1); frame();
+    ok &= ui_style == ST_LINE && !ux.hi && ux.style == ST_LINE && ux.mid != ux.text;
+    bad += check("STYLE: FLAT MAX and LINE MAX draw the labels in the text colour (ux.hi), back to LINE restores them", ok);
+    ui_style = 7; frame();                        /* unknown: FLAT */
+    ok = ui_style == ST_FLAT && !ux.hi;
+    ui_style = 2; frame();                        /* the retired PIXEL: LINE */
+    ok &= ui_style == ST_LINE && !ux.hi;
+    bad += check("STYLE: an unknown stored value reads as FLAT, the retired PIXEL as LINE", ok);
+    ui_style = ST_FLAT; frame();
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -10168,6 +10242,8 @@ int main(void)
     bad += test_panel();
     bad += test_layer();
     bad += test_rudi_print();
+    bad += test_rudi_print_to();
+    bad += test_style_max();
     bad += test_layer_knob_leak();
     bad += test_layer_knob_race();
     bad += test_fx_latch();

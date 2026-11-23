@@ -1617,10 +1617,16 @@ static void draw_confirm(void)
 /* the stored STYLE (ui_style: the menu, a settings import, a restore) into gfx.c's copy: the tokens again, all redrawn */
 static void style_apply(void)
 {
-    if (ui_style > ST_LINE)                             /* 2, the retired PIXEL: LINE; unknown: FLAT */
-        ui_style = ui_style == 2u ? ST_LINE : ST_FLAT;
-    if (ux.style != ui_style) {
-        ux.style = ui_style;
+    uint32_t hi, st;
+    if (ui_style == 2u)                                 /* 2, the retired PIXEL: LINE */
+        ui_style = ST_LINE;
+    else if (ui_style > ST_MAX + ST_LINE)               /* unknown: FLAT */
+        ui_style = ST_FLAT;
+    hi = ui_style >= ST_MAX;                            /* RudiSeq: FLAT MAX / LINE MAX, the text at full (gfx.c ux.hi) */
+    st = hi ? ui_style - ST_MAX : ui_style;
+    if (ux.style != st || ux.hi != hi) {
+        ux.style = (uint8_t)st;
+        ux.hi = (uint8_t)hi;
         palette_apply();
         ui.force = 1;
     }

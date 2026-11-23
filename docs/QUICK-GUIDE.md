@@ -1,6 +1,6 @@
 # RudimentSeq on the FM-1: quick guide
 
-Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.3, 2026-11-20.
+Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.5, 2026-11-23.
 
 ![FM-1 controls](controls.jpg)
 
@@ -72,7 +72,7 @@ Black keys F#3 G#3 A#3 C#4: momentary mutes T1 to T4. Hold a white key and turn 
 
 **SEQ held** (SEQ TOOLS, on the selected track; each tool is one undo, OCT− puts the pattern back)
 
-White keys from F3, in order: CLEAR, REVERSE, SHIFT <, SHIFT >, RANDOM, COOK, BEAT (drum; **PRINT** while RUDI is on), EUCLID, then on a DRUM track the lane's CLR, REV, FILL, RND, then DOUBLE and HALF. KNOB 1 to 4: LEN, DIV, SWING, GATE.
+White keys from F3, in order: CLEAR, REVERSE, SHIFT <, SHIFT >, RANDOM, COOK, BEAT (drum; **PRINT** while RUDI is on), EUCLID, then on a DRUM track the lane's CLR, REV, FILL, RND, then DOUBLE and HALF. While RUDI is on the black keys 1 to 4 are **PRINT TO** track 1 to 4 (a DRUM track's lanes 5 to 8 stay on black keys 5 to 8). KNOB 1 to 4: LEN, DIV, SWING, GATE.
 
 **EDIT held** (the engine)
 
@@ -99,6 +99,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 - **MIDI out** is automatic: the sequencer, the lanes and the arp go out over USB on each track's channel, and no note is ever left hanging.
 - **HOME > CLOCK, KNOB 4 SYNC ON**: MIDI clock, Start and Stop out when the FM-1 is the clock master.
 - **PRINT** (hold SEQ, tap E4 while RUDI is on): the lane's next LEN steps are written into the track's steps, as they would have played (the rate, probabilities, SMART, accents, RUDI 3's notes as they fall), and RUDI goes OFF: the track plays the print, and every step tool works on it. LEN and DIV set the length: 64 steps at 1/16 is 4 bars, at 1/8 8 bars. SAVE held undoes it (RUDI back on); RUDI on again and PRINT again for another roll.
+- **PRINT TO** (hold SEQ, tap black key 1 to 4 while RUDI is on): the same print, into track 1 to 4 (its LEN; its own RUDI goes OFF so you hear the print), and the lane keeps rolling on the track it is on: layer a rudiment's rolls onto the other tracks while it plays. SAVE held undoes it on that track.
 - **To hear only a rudiment lane**: hold GLO and mute the other tracks on the black keys (or solo its white key), or set MUTE on HOME > MIXER.
 
 ## Saving and loading
@@ -113,7 +114,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 
 ## The menu (hold HOME)
 
-ALGORITHM moves between the tabs DISPLAY, CONTROL, AUDIO, MIDI, SYSTEM; PRESETS moves through the rows; any knob or OCT+ / OCT− changes the value; HOME closes it. Worth knowing: COLOR (palettes), LARGE (big knob cards), FX LATCH, BPM LOCK, CLICK and COUNT-IN, MIDI IN (CH1-4, SEL, TRACK …), USB SERIAL OFF on macOS 13 to 15 for USB audio in, HELP ON for a hint when a page opens, ABOUT (shows the RudimentSeq release).
+ALGORITHM moves between the tabs DISPLAY, CONTROL, AUDIO, MIDI, SYSTEM; PRESETS moves through the rows; any knob or OCT+ / OCT− changes the value; HOME closes it. Worth knowing: COLOR (palettes; HI-CON and MONO are the brightest), STYLE (FLAT, LINE, and **FLAT MAX** / **LINE MAX**: every label and note letter at full brightness, for daylight; the backlight itself is always at full), LARGE (big knob cards), FX LATCH, BPM LOCK, CLICK and COUNT-IN, MIDI IN (CH1-4, SEL, TRACK …), USB SERIAL OFF on macOS 13 to 15 for USB audio in, HELP ON for a hint when a page opens, ABOUT (shows the RudimentSeq release).
 
 ## If something goes wrong
 

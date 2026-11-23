@@ -23,9 +23,13 @@ another, with the accents, ghosts and grace notes of the real sticking.
 - **Hand probability** (PRB R / PRB L): thin out one hand to open up the groove.
 - **Random notes on the scale** (RUDI 3: RNG R / RNG L, CHG): a hand wanders over up to two octaves above
   its note, on the track's SCL scale, picking anew on CHG % of its hits. A bass that walks, a kit that roams.
+- **STYLE FLAT MAX / LINE MAX** (MENU > DISPLAY > STYLE): every label, unit and note letter in the full text
+  colour instead of a 70 % blend, and the quick layers' cell names (SEQ TOOLS, GLO, FX) in it too, for the LCD in
+  daylight (the backlight has no dimmer: it is always at full).
 - **PRINT** (SEQ held, E4 while RUDI is on): the lane's next LEN steps written into the track's steps,
   as they would have played, RUDI off: a fixed loop of up to 64 steps (4 bars at 1/16, 8 at 1/8) that every
-  step tool can work on. SAVE held brings the lane back.
+  step tool can work on. SAVE held brings the lane back. **PRINT TO**: the black keys 1 to 4 print the
+  lane into track 1 to 4 instead (that track's LEN, its own RUDI off), and the lane keeps rolling where it is.
 - **SMART**: a 128-step cycle of scenes that raises and lowers the density on its own.
 - **FTHR**: feathering, the ghost notes get quieter the higher it goes.
 - **Four lanes**: each of the four tracks has its own rudiment, notes and settings. Two lanes on two
@@ -60,7 +64,7 @@ Felucca's installer and web editor work with a RudimentSeq device: they accept b
 
 ## Status
 
-r0.1.3, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
+r0.1.5, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
 The host test suite runs green but for one upstream text-spacing check. Please report problems in
 the issues of this repository (https://github.com/RudimentSeq/RudimentSeq-FM1), not to Felucca's author. Contact: jem@rudimentseq.com.
 

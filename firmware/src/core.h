@@ -13,7 +13,7 @@
 #define RUDISEQ_SPLASH_MS 2500u          /* the splash stays this long (main.c; the host platforms follow) */
 #define RUDISEQ_SPLASH_SKIP_MS 500u      /* .. a key or button after this ends it early */
 #ifndef RUDISEQ_VERSION
-#define RUDISEQ_VERSION "r0.1.3"     /* the fork's release; FELUCCA_VERSION (felucca.c / build.py) is the upstream it is built on */
+#define RUDISEQ_VERSION "r0.1.5"     /* the fork's release; FELUCCA_VERSION (felucca.c / build.py) is the upstream it is built on */
 #endif
 #define RUDISEQ_AUTHOR "jem@rudimentseq.com"      /* the credit line on the about page */
 #define RUDISEQ_URL "rudimentseq.com"             /* the project site; the repository is linked from it */

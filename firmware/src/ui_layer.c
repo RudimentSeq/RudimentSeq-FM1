@@ -387,6 +387,21 @@ static void glo_tap(void)
 }
 
 /* SEQ TOOLS: white key place p's action on the selected track (ui_tools.c), "STOP TO EDIT" while a song plays */
+/* RudiSeq: black key d (0..3) while RUDI is on: the lane printed into track d + 1 (one undo, SAVE held) */
+static void tools_print_to(uint32_t d)
+{
+    if (chain_busy()) {
+        ui_message("STOP TO EDIT");
+        return;
+    }
+    if (eu.on)
+        eu_close(TSEL, 1);
+    ui_message(tl_print_to(TSEL, d));
+    if (!lys.loaded)
+        str_cpy(ui.msg2, "[SAVE] HOLD TO UNDO", sizeof ui.msg2);
+    lys.loaded = 1;
+    ui.force = 1;
+}
 static void tools_key(uint32_t p)
 {
     const char *m;
@@ -675,6 +690,8 @@ static void layer_key(uint32_t l, uint32_t k)
     } else if (l == LAYER_SEQ) {
         if (!key_black(k))
             tools_key(p);
+        else if (p < NTRK && TSEL->p[P_RUDION])
+            tools_print_to(p);                          /* (RudiSeq: black keys 1..4 PRINT TO T1..T4) */
         else if (p < NLANE && drum_track(TSEL)) {
             ui.lane = (uint8_t)p;                       /* (black keys 1..8: the lane, as on the grid) */
             eu_lane(TSEL);                              /* (EUCLID open: on that lane now) */
@@ -864,8 +881,9 @@ static uint32_t layer_leds(uint32_t *br)
             on = a->on(TSEL, a->arg) != 0u;             /* a HOLD one off breathes, none dark */
             can = a->kind == LK_HOLD;
         } else if (l == LAYER_SEQ) {                    /* the tools breathe (not while a song plays); DRUM: the lane */
-            on = (b && p < NLANE && drum_track(TSEL) && p == ui.lane) || (!b && p == TL_EUCLID && eu.on);   /* lit, the */
-            can = b ? p < NLANE && drum_track(TSEL) : tl_cell(TSEL, p) && !chain_busy();
+            e = b && p < NTRK && TSEL->p[P_RUDION];  /* (RudiSeq: black keys 1..4 PRINT TO T1..T4 while RUDI is on) */
+            on = (b && !e && p < NLANE && drum_track(TSEL) && p == ui.lane) || (!b && p == TL_EUCLID && eu.on);   /* lit, the */
+            can = b ? (e || (p < NLANE && drum_track(TSEL))) && !chain_busy() : tl_cell(TSEL, p) && !chain_busy();
         } else if (l == LAYER_REC && !b && p < 4u) {    /* a setting on (LEVEL: the click on) lit, the rest breathe; */
             on = p == 1u ? rp_get(RP_CLICK) != 0u : p == 2u ? rp_get(RP_COUNTIN) != 0u :   /* CLEAR: something to */
                  p == 3u && rp_get(RP_CLICK) != 0u;    /* clear, not while a song plays */
@@ -906,7 +924,7 @@ static uint16_t lc_fill(uint32_t st, uint16_t *ink)
 {
     uint32_t alt = st & LS_ALT;
     st &= ~LS_ALT;
-    *ink = st == LS_DIM ? T_DIM : T_THEME;
+    *ink = st == LS_DIM ? T_DIM : ux.hi ? T_TEXT : T_THEME;   /* (RudiSeq STYLE MAX: a cell's name as bright as the header's) */
     if (st == LS_MUTE) {
         *ink = T_INK;
         return T_KEY;
@@ -1093,8 +1111,8 @@ static void layer_euclid(void)
 }
 static void layer_seq(void)
 {
-    uint32_t p, st = chain_busy() ? LS_DIM : LS_OFF, drum = (uint32_t)drum_track(TSEL);
-    char n[3] = {0, 0, 0}, nm[8];
+    uint32_t p, pr, st = chain_busy() ? LS_DIM : LS_OFF, drum = (uint32_t)drum_track(TSEL);
+    char n[3] = {0, 0, 0}, nm[8], tn[3] = {'T', '1', 0};
     if (eu.on)
         layer_euclid();
     for (p = 0; p < TL_DOUBLE && !eu.on; p++) {
@@ -1108,11 +1126,24 @@ static void layer_seq(void)
         }
         lcell(LC_X(p % 4u), 4 + 32 * (int32_t)(p / 4u), 28, n, tl_print_key(TSEL, p) ? ICON_STEPS : TL_ICON[p], 0, nm, st, 0);
     }
+    pr = TSEL->p[P_RUDION] ? NTRK : 0u;                /* RudiSeq: black keys 1..4 PRINT TO T1..T4 while RUDI is on */
     for (p = 0; drum && p < NLANE; p++) {               /* the lanes (black keys 1..8): 8 cells of 18 px, 2 px apart */
         int32_t x = 6 + 20 * (int32_t)p;
-        uint16_t ink, fill = lc_box(x, 100, 18, 18, lc_fill(p == ui.lane % NLANE ? LS_SEL : LS_OFF, &ink));
+        uint16_t ink, fill = lc_box(x, 100, 18, 18, lc_fill(p >= pr && p == ui.lane % NLANE ? LS_SEL : st, &ink));
+        if (p < pr) {
+            tn[1] = (char)('1' + p);
+        }
         GFX_HOOK_ALIGN(x, 100, x + 18, 118, AL_HV, "tools lane cell name centred");
-        cv_text_in(x, 100 + CAP_IN(S, 18), 18, &AF_S, drum_lane_abbr(TSEL, p), ink, fill);
+        cv_text_in(x, 100 + CAP_IN(S, 18), 18, &AF_S, p < pr ? tn : drum_lane_abbr(TSEL, p), ink, fill);
+    }
+    for (p = 0; !drum && !eu.on && p < pr; p++) {      /* (a melodic track: 4 cells of 38 px, the key and the track) */
+        int32_t x = 6 + 40 * (int32_t)p;
+        uint16_t ink, fill = lc_box(x, 100, 38, 18, lc_fill(st, &ink));
+        tn[1] = (char)('1' + p);
+        GFX_HOOK_ALIGN(0, 100, 0, 118, AL_V, "tools print-to cell on its middle");
+        cv_icon_in(x + 4, 100, 0, 18, 12, trk_icon(p, 0), ink, fill);   /* (the track's icon, as GLO's cells) */
+        GFX_HOOK_ALIGN(0, 100, 0, 118, AL_V, "tools print-to cell on its middle");
+        cv_text_r(x + 34, 100 + CAP_IN(S, 18), &AF_S, tn, ink, fill);
     }
     for (p = TL_DOUBLE; !eu.on && p < TL_N; p++) {     /* 1.5.5: D5 DOUBLE (x2), E5 HALF (/2) at the row's end, */
         int32_t x = 168 + 35 * (int32_t)(p - TL_DOUBLE);   /* 31 px each (the lanes' row: no room for their names) */

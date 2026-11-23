@@ -48,6 +48,27 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-23: STYLE FLAT MAX / LINE MAX, the text at full (r0.1.5)
+
+- `gfx.c` ux.hi, ST_MAX: ui_style 3 / 4 = FLAT / LINE with MID set to TEXT and DIM to MID's blend (palette_set);
+  `ui_draw.c` style_apply maps them; `settings_persist.c` keeps 3 and 4 (2 still PIXEL = LINE, above 4 FLAT);
+  `menu_items.c` STYLE has four values. The FM-1's backlight is a plain on / off pin shared with the key
+  matrix (no PWM), so brightness itself cannot be raised: this is the daylight option. `ui_layer.c` lc_fill:
+  the quick layers' cell names (SEQ TOOLS, GLO, FX, EDIT, REC) in TEXT too, not THEME (on GREY a 70 % grey
+  beside the header's white: what Jem saw).
+- `core.h`: RUDISEQ_VERSION r0.1.5. `tests/ui_test.c`: test_style_max; the STYLE ladder test covers four values.
+
+## 2026-11-20: PRINT TO any track (r0.1.4)
+
+- `ui_tools.c` tl_print takes a source and a destination track; tl_print_to: a black key 1..4 in SEQ TOOLS
+  while the selected track's RUDI is on prints its lane into that track (the destination's LEN, its own RUDI
+  OFF, the undo copy taken of it: SAVE held undoes it there); the source lane keeps rolling. Its own black
+  key does what E4 does. "PRINTED n HITS TO T3".
+- `ui_layer.c`: the SEQ layer's black keys 1..4 dispatch to tools_print_to while RUDI is on (before a DRUM
+  track's lane pick); the lanes row shows T1..T4 (a DRUM track: in place of lanes 1..4; a melodic track:
+  four cells with the track icons); the LEDs breathe for them.
+- `core.h`: RUDISEQ_VERSION r0.1.4. `tests/ui_test.c`: test_rudi_print_to (into T3, undo there, own key).
+
 ## 2026-11-20: PRINT, and the hands' notes by name (r0.1.3)
 
 - `ui_tools.c` tl_print: SEQ TOOLS' E4 (BEAT's key) is PRINT while the track's RUDI is on: the lane's next

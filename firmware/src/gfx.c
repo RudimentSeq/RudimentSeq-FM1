@@ -89,6 +89,7 @@ static struct {
     uint16_t mid, dim, line, sel, tint, ink, rec, raise, key, lane, grid, ok;
     uint8_t light, mono;
     uint8_t style;               /* MENU > STYLE (ui.c style_apply): ST_FLAT, ST_LINE */
+    uint8_t hi;                  /* RudiSeq: STYLE FLAT MAX / LINE MAX: the text at full (MID is TEXT, DIM is MID's blend) */
     uint32_t gen;                /* bumped by palette_set (the text ramps follow) */
 } ux;
 /* STYLE: FLAT, the filled SURF cards and panels; LINE, no SURF (it is BG) and 1 px T_RULE dividers between the
@@ -96,6 +97,7 @@ static struct {
  * Selections, accents, keys and gauges keep their fills in every style */
 #define ST_FLAT 0u
 #define ST_LINE 1u
+#define ST_MAX 3u                /* RudiSeq: ui_style ST_MAX + ST_FLAT / ST_LINE: the same with the text at full (ux.hi) */
 #define T_RULE ux.dim            /* LINE: the dividers (DIM: visible on NIGHT, GREY, MONO and PAPER, quieter than labels) */
 #define T_BG ux.bg               /* background */
 #define T_SURF ux.surf           /* dialogs, menu rows, mixer strips */
@@ -165,6 +167,10 @@ static void palette_set(uint32_t i)
     ux.mid = ux_mix(ux.bg, ux.text, UI_MID_PCT);
     ux.dim = ux_mix(ux.bg, ux.text, UI_DIM_PCT);
     ux.line = ux_mix(ux.bg, ux.text, UI_LINE_PCT);
+    if (ux.hi) {                                 /* RudiSeq: STYLE .. MAX: labels and notes as bright as the values' */
+        ux.mid = ux.text;                        /* text; the inactive at what the labels were (daylight on the LCD) */
+        ux.dim = ux_mix(ux.bg, ux.text, UI_MID_PCT);
+    }
     ux.sel = ux_mix(ux.bg, ux.theme, UI_SEL_PCT);
     ux.tint = ux_mix(ux.bg, ux.theme, UI_TINT_PCT);
     ux.ink = ux.bg;

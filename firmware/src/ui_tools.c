@@ -35,12 +35,12 @@ static int tl_print_key(const track_t *t, uint32_t p) { return p == TL_BEAT && t
  * TIEs through the skipped steps), PRB and SMART rolled with the lane's own dice, the velocity model (an accent as a
  * step accent), RUDI 3's notes as they fall; nothing sounds. Then RUDI OFF: the track plays the print, which takes
  * every step tool and the undo. Returns the hits written; the lane's dice move on (another PRINT, another roll). */
-static uint32_t tl_print(track_t *t, uint32_t len)
+static uint32_t tl_print(track_t *src, track_t *dst, uint32_t len)   /* src's lane into dst's steps */
 {
-    rudi_lane_t *live = &rudi[trk_index(t)], sim;
-    const rudiment_t *rd = &RUDIMENTS[(uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS];
-    uint32_t i, hits = 0, held = 0, every = (uint32_t)t->p[P_RUDION];
-    int drum = drum_track(t);
+    rudi_lane_t *live = &rudi[trk_index(src)], sim;
+    const rudiment_t *rd = &RUDIMENTS[(uint32_t)src->p[P_RUDI] % NUM_RUDIMENTS];
+    uint32_t i, hits = 0, held = 0, every = (uint32_t)src->p[P_RUDION];
+    int drum = drum_track(dst);
     if (!rudi_ready)
         rudi_init();
     sim = *live;
@@ -49,7 +49,7 @@ static uint32_t tl_print(track_t *t, uint32_t len)
     sim.skip = 0;
     sim.cur[0] = sim.cur[1] = 0;
     for (i = 0; i < len; i++) {
-        step_t *s = &t->step[i];
+        step_t *s = &dst->step[i];
         const rudi_hit_t *h;
         uint32_t ss = sim.sstep;
         step_clear(s);
@@ -64,12 +64,12 @@ static uint32_t tl_print(track_t *t, uint32_t len)
         sim.hit = (uint8_t)((sim.hit + 1u) % rd->nHits);
         sim.sstep = (uint8_t)((sim.sstep + 1u) & 127u);
         held = 0;
-        if (h->hand < 0 || !rudi_fires(t, &sim, h, ss))
+        if (h->hand < 0 || !rudi_fires(src, &sim, h, ss))
             continue;                                   /* a rest, or rolled out */
         s->time = ST_NOTE;
         s->n = 1;
-        s->note[0] = (uint8_t)rudi_note(t, &sim, h->hand ? 1u : 0u);
-        s->vel = (uint8_t)rudi_vel(t, h);
+        s->note[0] = (uint8_t)rudi_note(src, &sim, h->hand ? 1u : 0u);
+        s->vel = (uint8_t)rudi_vel(src, h);
         if (h->accent)
             s->flags |= SF_ACCENT;
         if (drum)
@@ -78,8 +78,8 @@ static uint32_t tl_print(track_t *t, uint32_t len)
         hits++;
     }
     live->rng = sim.rng;
-    rudi_hush(t);                                       /* the lane's held note off; the print plays from here */
-    t->p[P_RUDION] = 0;
+    rudi_hush(dst);                                     /* its lane's held note off; the print plays from here */
+    dst->p[P_RUDION] = 0;                               /* (another track: its own RUDI off, src's lane keeps rolling) */
     return hits;
 }
 
@@ -122,6 +122,25 @@ static void tl_unlock(track_t *t, uint64_t was, uint32_t len)
     for (i = 0; i < len; i++)
         if (((was >> i) & 1u) && t->step[i].time == ST_REST)
             (void)motion_clear_locks(t, i);
+}
+/* RudiSeq: a black key 1..4 while RUDI is on prints the lane into that track (its own: as E4). The message */
+static const char *tl_print_to(track_t *src, uint32_t d)
+{
+    static char b[28];
+    track_t *dst = &trk[d % NTRK];
+    uint32_t len = tl_len(dst);
+    uint64_t was = tl_used(dst, len);
+    tl_undo_take(dst);
+    undo.rudi = 1;                                      /* SAVE held: dst's steps and its RUDI back */
+    str_cpy(b, "PRINTED ", sizeof b);
+    fmt_int(b + str_len(b), (int32_t)tl_print(src, dst, len));
+    str_cpy(b + str_len(b), " HITS", sizeof b - str_len(b));
+    if (dst != src) {
+        str_cpy(b + str_len(b), " TO T", sizeof b - str_len(b));
+        fmt_int(b + str_len(b), (int32_t)(d % NTRK) + 1);
+    }
+    tl_unlock(dst, was, len);
+    return b;
 }
 
 /* step j of t becomes the undo copy's step src[j] (taken just before), its automation and locks with it */
@@ -661,7 +680,7 @@ static const char *tl_do(track_t *t, uint32_t p, uint32_t l)
         if (print) {                                    /* RudiSeq: PRINT (the key doubles while RUDI is on) */
             undo.rudi = 1;                              /* SAVE held: the steps and RUDI ON back */
             str_cpy(b, "PRINTED ", sizeof b);
-            fmt_int(b + str_len(b), (int32_t)tl_print(t, len));
+            fmt_int(b + str_len(b), (int32_t)tl_print(t, t, len));
             str_cpy(b + str_len(b), " HITS", sizeof b - str_len(b));
             msg = b;
             break;
