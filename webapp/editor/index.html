@@ -1811,8 +1811,9 @@ function makeMockDevice(opt = {}) {
     D("ATAMT", F.BIPCT, -64, 63, 0));
   TP.push(E("RUDI", ["OFF", "1X", "2X", "3X", "4X"], 0), D("RUDMT", F.INT, 0, 173, 15), D("PRB R", F.PCT, 0, 100, 100), D("PRB L", F.PCT, 0, 100, 100),   /* RudiSeq (106..113): ON, rudiment, hand probability, */
     E("SMART", NONOFF, 0), D("FTHR", F.PCT, 0, 100, 0), D("NTE R", F.INT, 0, 127, 38), D("NTE L", F.INT, 0, 127, 37),   /* smart, feather, hand notes (rudi.c) */
-    D("RNG R", F.INT, 0, 24, 0), D("RNG L", F.INT, 0, 24, 0), D("CHG", F.PCT, 0, 100, 100));   /* RUDI 3 (114..116): random range on the scale, change % */
-  const P_COUNT = 125, G_COUNT = 27, NSTEP = 64, P_E0 = 117, G_ENGSEL = 20, P_SLCR = 45;
+    D("RNG R", F.INT, 0, 24, 0), D("RNG L", F.INT, 0, 24, 0), D("CHG", F.PCT, 0, 100, 100),   /* RUDI 3 (114..116): random range on the scale, change % */
+    E("CHAIN", ["OFF", "ON", "RESHUF"], 0), D("REPS", F.INT, 1, 8, 1));   /* PACK (117, 118): the pack of rudiments the lane walks, passes of each */
+  const P_COUNT = 127, G_COUNT = 27, NSTEP = 64, P_E0 = 119, G_ENGSEL = 20, P_SLCR = 45;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const enumOrig = (d, v) => d.fmt === F.ENUM && d.names ? aliasOf(d.names, v - d.min) + d.min : v;   /* params.c enum_orig */
   /* four tracks (firmware v3), four synth parts (1.0); engine / preset / p / step below are the selected track's */

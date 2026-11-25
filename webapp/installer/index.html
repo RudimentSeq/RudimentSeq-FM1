@@ -804,7 +804,7 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "r0.1.6", "product": "FM-1_900", "pkg": "../../firmware/RudimentSeq-r0.1.6-FM-1.fwsc"};
+const meta = {"version": "r0.1.7", "product": "FM-1_900", "pkg": "../../firmware/RudimentSeq-r0.1.7-FM-1.fwsc"};
 
 let writing = false, stock = null, stockFileEpoch = 0;
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
