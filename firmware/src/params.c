@@ -20,6 +20,7 @@ static const char *const N_DTIME[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T",
 static const char *const N_SCALE[] = {"CHR", "MAJ", "MIN", "DOR", "MIX", "PEN", "MPEN", "HARM",
                                     "PHRY", "LYD", "LOC", "MEL", "BLUES", "WHOLE", "DIMHW", "DIMWH"};
 static const char *const N_ONOFF[] = {"OFF", "ON"};
+static const char *const N_CHAIN[] = {"OFF", "ON", "RESHUF"};   /* RudiSeq PACK: CHAIN walks the pack; RESHUF shuffles it again at every lap */
 /* ANALOG's filter TYPE (1.5, #104; eng_analog.c): the SVF's low-pass (as always), band-pass, high-pass output */
 static const char *const N_FTYPE[] = {"LP", "BP", "HP"};
 /* ENV SYNC (1.5, #175; voice.c esync_coef): ATK DEC REL as note values of the tempo, shortest first. 0..127 split
@@ -194,6 +195,9 @@ static const param_desc_t TP[P_COUNT] = {
                                                    * between NTE and NTE + RNG semitones (0: NTE itself) */
     [P_RUDRL] = PD("RNG L", F_INT, 0, 24, 0),
     [P_RUDCHG] = PD("CHG", F_PCT, 0, 100, 100),   /* .. and picks a new one on this % of its hits (else keeps the last) */
+    [P_RUDCH] = PE("CHAIN", N_CHAIN, 0),          /* PACK (2026-11-25): ON walks the track's pack, a rudiment after REPS passes of the
+                                                   * one before; RESHUF shuffles the pack again at the end of every lap (rudi.c) */
+    [P_RUDREP] = PD("REPS", F_INT, 1, 8, 1),      /* .. passes of each rudiment before the next */
 };
 
 /* the INSERT's A B C as its TYPE means them (TP's ranges and defaults): the drives DRIVE TONE LEVEL, CRUSH BITS RATE
@@ -480,7 +484,8 @@ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACK
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
        GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS,     /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
-     GR_RUDI };                               /* RudiSeq: the rudiment's name and sticking (ui_graph.c) */
+     GR_RUDI,                                 /* RudiSeq: the rudiment's name and sticking (ui_graph.c) */
+     GR_PACK };                               /* RudiSeq PACK: the track's 16 slots, the bank while filling (ui_graph.c graph_pack) */
 
 typedef struct {
     const char *title;
@@ -543,6 +548,9 @@ static const page_t PAGES[] = {
     {"RUDI 2", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDSMA, P_RUDFEA, P_RUDPR, P_RUDPL}},
     {"RUDI 3", FAM_SEQ, SC_TRACK, GR_RUDI, {P_RUDRR, P_RUDRL, P_RUDCHG, 0xFF}},   /* 2026-11-18: the hands' random range on the
                                                                              * track's scale, how often a hit picks anew */
+    {"PACK", FAM_SEQ, SC_TRACK, GR_PACK, {P_RUDCH, P_RUDREP, 0xFF, 0xFF}},   /* 2026-11-25: the pack of 16 rudiments the lane
+                                                                             * walks (CHAIN, REPS); REC fills it from the keys,
+                                                                             * the keys jump, shuffle, deal (ui_input.c pack_keys) */
     {"DETAIL", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},   /* 1.5.1 (#199): the cursor step's CHANCE RATCH NUDGE VEL
                                                              * (ui.c detail_on, ui_input.c sd_turn) */
     {"AUTOMATION", FAM_SEQ, SC_TRACK, GR_EVENTS, {0xFF, 0xFF, 0xFF, 0xFF}},  /* the locks, events, CHANCE and RATCH as a

@@ -26,6 +26,10 @@ another, with the accents, ghosts and grace notes of the real sticking.
 - **RUDI KEYS** (the RUDI pages while RUDI is on): the 16 white keys are 16 rudiments, the 11 black keys the
   banks of 16: tap to switch and stay, hold to play one while held. Jam rudiments live, any jump; the panel shows
   the bank's names, the LEDs the current rudiment and bank.
+- **PACK** (SEQ's page after RUDI 3): a pack of up to 16 rudiments per track, in the order you tapped them in
+  (REC on the page, then the keys as in RUDI KEYS). CHAIN ON walks it, each rudiment for REPS passes, round and
+  round; RESHUF shuffles the pack again at every lap. Black key 1 shuffles it, black key 2 deals 16 new ones from
+  all 174, a white key jumps to a slot; SAVE held undoes a shuffle, a deal or a fill. Saved with the project.
 - **STYLE FLAT MAX / LINE MAX** (MENU > DISPLAY > STYLE): every label, unit and note letter in the full text
   colour instead of a 70 % blend, and the quick layers' cell names (SEQ TOOLS, GLO, FX) in it too, for the LCD in
   daylight (the backlight has no dimmer: it is always at full).
@@ -67,7 +71,7 @@ Felucca's installer and web editor work with a RudimentSeq device: they accept b
 
 ## Status
 
-r0.1.6, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
+r0.1.7, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
 The host test suite runs green but for one upstream text-spacing check. Please report problems in
 the issues of this repository (https://github.com/RudimentSeq/RudimentSeq-FM1), not to Felucca's author. Contact: jem@rudimentseq.com.
 

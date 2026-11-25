@@ -705,18 +705,19 @@ static int formats(void)
 static int midi_track_fmt(void)
 {
     int bad = 0, ok;
-    uint32_t i, end = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t);
+    uint32_t i, end = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + sizeof(chain_config_t) + sizeof(motion_store_t) +
+                      PROJ_PACK_BYTES;                  /* (r0.1.7: the packs after the motion) */
     project_t a, b;
     static project_store_t st, old;
     int16_t r;
     memset(song.mch, 0, sizeof song.mch);
     song.g[G_ROUTE] = 0;
     project_capture(&a);
-    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 8u;
+    ok = proj_pack(&st, &a) && PROJ_MIDI_OFF == PROJ_FM6_OFF - 3u && end <= PROJ_MIDI_OFF && PROJ_FM6_OFF - end == 4u;
     for (i = end; i < PROJ_FM6_OFF; i++)
         ok &= st.raw[i] == 0u;
     ok &= proj_import(&b, &st, sizeof st) && !memcmp(&a, &b, sizeof a) && !b.mch[0] && !b.mch[3] && !b.g[G_ROUTE];
-    bad += check("MIDI IN TRACK (1.5.5): CH1-4 and the default channels pack as before (the 14 spare bytes all 0)", ok);
+    bad += check("MIDI IN TRACK (1.5.5): CH1-4 and the default channels pack as before (the 4 spare bytes all 0)", ok);
 
     song.g[G_ROUTE] = ROUTE_TRACK;
     mch_set(0, 9); mch_set(1, 1); mch_set(2, MCH_OMNI); mch_set(3, MCH_OFF);

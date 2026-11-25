@@ -342,6 +342,7 @@ static uint32_t scale_leds(uint32_t *root)
 
 static uint32_t song_leds(void);
 static uint32_t rudi_leds(void);                        /* (RudiSeq RUDI KEYS, below) */
+static uint32_t pack_leds(void);                        /* (RudiSeq PACK, below) */
 /* MENU > ANIM IDLE (1.2, Discussion #135): after IDLE_LEDS_MS without panel input (ui.c scrn.idle: a button or key
  * pressed or held, a knob turned; what SCREEN OFF counts) the LEDs play the idle animation (bsp/boards/fm1/fm1_led_anim.h
  * fm1_idle_level: a soft light drifting over the keys and back, the buttons breathing with it; the scan draws it,
@@ -376,7 +377,7 @@ static uint32_t key_leds(uint32_t *br)                 /* (*br: a layer's keys t
         *br = 0;
     c = name_on() && !ui.menu ? name_leds() : ui.layer ? layer_leds(br) : grid_on() ? grid_leds() :
                  (fm1_in.notes & ~kb_layer) | play_leds() | step_leds() | (song_keys_on() ? song_leds() : 0u) |
-                 (rudi_keys_on() ? rudi_leds() : 0u);   /* (RudiSeq RUDI KEYS) */
+                 (rudi_keys_on() ? rudi_leds() : 0u) | (pack_keys_on() ? pack_leds() : 0u);   /* (RudiSeq RUDI KEYS, PACK) */
 #if FELUCCA_SLICE
     if (!ui.layer && !ui.menu && !name_on() && slice_page_on())
         c |= slice_leds();                              /* SLICES: and the keys of the selected slice */
@@ -425,7 +426,8 @@ static void ui_leds(void)
         led_put(nl, panel.btn[B_FX], 1);                /* FX LATCH: lit while an effect or a macro is on */
     if (ui.layer)                                       /* the layer's button breathes while its map is up */
         led_put(nb, panel.btn[layer_btn()], 1);
-    led_put(nl, panel.btn[B_REC], song.rec != 0u && ui.layer != LAYER_REC);   /* (its layer: it breathes) */
+    led_put(nl, panel.btn[B_REC], (song.rec != 0u || pk.fill) && ui.layer != LAYER_REC);   /* (its layer: it breathes;
+                                                         * RudiSeq PACK: lit while the pack is being filled) */
     k = oct_leds();
     led_put(nl, panel.btn[B_OCTDN], (int)(k & 1u));
     led_put(nl, panel.btn[B_OCTUP], (int)((k >> 1) & 1u));
@@ -641,6 +643,175 @@ static uint32_t rudi_leds(void)
     }
     return m;
 }
+/* RudiSeq PACK (ui.c pk, rk's bank): the PACK page's keys. Filling (REC tapped there, pack_fill): the white keys are the
+ * bank's rudiments, as RUDI KEYS, and each tap writes the next slot and plays it (the lane from that slot); the black keys
+ * change the bank; the 16th slot ends it, as REC again or leaving the page does (nothing tapped: the pack as it was).
+ * Not filling: a white key jumps the lane to that slot (CHAIN off too: the pack as 16 favourites), black key 1 shuffles
+ * the pack, black key 2 deals 16 different rudiments from all there are. Each of those takes the undo copy first:
+ * SAVE held puts the pack back (ui.c undo_swap swaps it with the steps; the steps did not change) */
+static void tl_undo_take(track_t *t);                   /* (ui_tools.c) */
+static uint32_t pk_rand(void)                           /* xorshift32, the UI's own dice */
+{
+    if (!pk.rng)
+        pk.rng = 0x2545F491u ^ fm1_ms ^ (uint32_t)TSEL->p[P_RUDI] << 20;
+    pk.rng ^= pk.rng << 13; pk.rng ^= pk.rng >> 17; pk.rng ^= pk.rng << 5;
+    return pk.rng >> 8;
+}
+static void pack_undo(track_t *t)                       /* the copy SAVE held puts back: the pack, and the lane with it */
+{
+    tl_undo_take(t);
+    undo.rudi = 1;
+}
+static void pack_fill_end(void)                         /* REC again, the 16th slot, another page or track */
+{
+    if (!pk.fill)
+        return;
+    pk.fill = 0;
+    if (!pk.n) {                                        /* nothing tapped: the pack as it was (never touched) */
+        ui_message("PACK KEPT");
+    } else {
+        char b[4];
+        fmt_int(b, (int32_t)pk.n);
+        ui_say(b, " IN THE PACK");
+        str_cpy(ui.msg2, "[SAVE] HOLD TO UNDO", sizeof ui.msg2);
+    }
+    ui.force = 1;
+}
+static void pack_fill_start(track_t *t)                 /* (the old pack stays until the first slot is written) */
+{
+    pack_undo(t);
+    pk.fill = 1;
+    pk.n = 0;
+    pk.trk = (uint8_t)trk_index(t);
+    rk.show = 0;
+    ui_message("TAP RUDIMENTS, REC ENDS");
+    ui.force = 1;
+}
+static void pack_shuffle(track_t *t)
+{
+    uint32_t i, n = t->npack;
+    if (n < 2u) {
+        ui_message(n ? "ONE IN THE PACK" : "EMPTY PACK  [REC] FILLS");
+        return;
+    }
+    pack_undo(t);
+    for (i = n; i > 1u; i--) {                          /* Fisher-Yates */
+        uint32_t j = pk_rand() % i;
+        uint8_t v = t->pack[i - 1u];
+        t->pack[i - 1u] = t->pack[j];
+        t->pack[j] = v;
+    }
+    ui_message("PACK SHUFFLED");
+    str_cpy(ui.msg2, "[SAVE] HOLD TO UNDO", sizeof ui.msg2);
+    ui.force = 1;
+}
+static void pack_deal(track_t *t)                       /* 16 different rudiments, drawn from all there are */
+{
+    uint8_t all[NUM_RUDIMENTS];
+    uint32_t i;
+    for (i = 0; i < NUM_RUDIMENTS; i++)
+        all[i] = (uint8_t)i;
+    pack_undo(t);
+    for (i = 0; i < RUDI_PACK; i++) {                   /* (the first 16 of a shuffle) */
+        uint32_t j = i + pk_rand() % (NUM_RUDIMENTS - i);
+        uint8_t v = all[j];
+        all[j] = all[i];
+        all[i] = v;
+        t->pack[i] = v;
+    }
+    t->npack = RUDI_PACK;
+    ui_message("16 NEW IN THE PACK");
+    str_cpy(ui.msg2, "[SAVE] HOLD TO UNDO", sizeof ui.msg2);
+    ui.force = 1;
+}
+static void pack_keys(uint32_t notes)
+{
+    track_t *t = TSEL;
+    uint32_t k, rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
+    if (!rk.on) {                                       /* (the bank: RUDMT's, as RUDI KEYS) */
+        rk.on = 1;
+        rk.bank = (uint8_t)(rud / RK_BANK);
+        rk.seen = (int16_t)rud;
+        rk.key = 0;
+        rk.show = 0;
+    }
+    if ((uint32_t)rk.seen != rud) {
+        rk.bank = (uint8_t)(rud / RK_BANK);
+        rk.seen = (int16_t)rud;
+    }
+    for (k = 0; k < 27u; k++) {
+        uint32_t p, r;
+        if (!((notes >> k) & 1u))
+            continue;
+        p = key_place(k);
+        if (pk.fill) {
+            char b[16];
+            if (key_black(k)) {
+                if (p < RK_BANKS) {
+                    rk.bank = (uint8_t)p;
+                    ui.force = 1;
+                }
+                continue;
+            }
+            if (p >= RK_BANK)
+                continue;
+            r = rk.bank * RK_BANK + p;
+            if (r >= NUM_RUDIMENTS) {
+                ui_message("NO RUDIMENT THERE");
+                continue;
+            }
+            t->pack[pk.n] = (uint8_t)r;
+            t->npack = (uint8_t)(pk.n + 1u);
+            rudi_pack_jump(t, pk.n);                    /* it plays: RUDMT, the lane from this slot */
+            rk.seen = (int16_t)r;
+            fmt_int(b, (int32_t)pk.n + 1);
+            str_cpy(b + str_len(b), " ", 2);
+            str_cpy(b + str_len(b), RUDIMENTS[r].sname, sizeof b - str_len(b));
+            ui_say("SLOT ", b);
+            ui.force = 1;
+            if (++pk.n >= RUDI_PACK)
+                pack_fill_end();
+            continue;
+        }
+        if (key_black(k)) {
+            if (p == 0u)
+                pack_shuffle(t);
+            else if (p == 1u)
+                pack_deal(t);
+            continue;
+        }
+        if (p >= RK_BANK)
+            continue;
+        if (p >= t->npack) {
+            ui_message(t->npack ? "EMPTY SLOT" : "EMPTY PACK  [REC] FILLS");
+            continue;
+        }
+        rudi_pack_jump(t, p);
+        rk.seen = t->p[P_RUDI];
+        ui.force = 1;
+    }
+}
+/* their LEDs: filling, the bank's (rudi_leds); else the slot playing's white key (CHAIN off: the first slot holding RUDMT) */
+static uint32_t pack_leds(void)
+{
+    const track_t *t = TSEL;
+    uint32_t k, pos, rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
+    if (pk.fill)
+        return rudi_leds();
+    pos = rudi_pack_pos(t);
+    if (pos == 0xFFu)
+        for (k = 0; k < t->npack; k++)
+            if (t->pack[k] == rud) {
+                pos = k;
+                break;
+            }
+    if (pos == 0xFFu)
+        return 0;
+    for (k = 0; k < 27u; k++)
+        if (!key_black(k) && key_place(k) == pos)
+            return 1u << k;
+    return 0;
+}
 /* the key LEDs of SONG: the key of the selected cell's slot (none for "-" and on + ADD) */
 static uint32_t song_leds(void)
 {
@@ -660,6 +831,13 @@ static uint32_t song_leds(void)
 static int rec_tap(void)                                /* 1: the arming changed */
 {
     uint8_t bit = (uint8_t)(1u << song.sel);
+    if (pack_page_on()) {                               /* RudiSeq PACK: REC fills the pack, again ends it (no arming) */
+        if (pk.fill)
+            pack_fill_end();
+        else
+            pack_fill_start(TSEL);
+        return 0;
+    }
     if (chain_busy()) {
         ui_message("STOP TO RECORD");
         return 0;
@@ -1846,12 +2024,16 @@ static void ui_input(void)
         slice_keys_pick(notes);
 #endif
     lock_keys();                                        /* (a grid key on a hit let go: the hit goes) */
-    if (song.grid != 4u)
+    if (song.grid != 4u && song.grid != 5u)
         rk.on = 0;                                      /* (RudiSeq: the rudiment keys start afresh next time) */
+    if (song.grid != 5u || pk.trk != song.sel)
+        pack_fill_end();                                /* (RudiSeq PACK: another page, a dialog, another track: the fill is over) */
     if (song.grid == 3u) {
         song_keys(notes);
     } else if (song.grid == 4u) {
         rudi_keys(notes);                               /* RudiSeq RUDI KEYS (ui.c) */
+    } else if (song.grid == 5u) {
+        pack_keys(notes);                               /* RudiSeq PACK (ui.c) */
     } else if (song.grid) {
         grid_keys(notes);
     } else if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */

@@ -177,8 +177,9 @@ int main(void)
                  P_SLCR == P_DETUNE + 1 && P_SLDEPTH + 1 == P_M1SRC && P_M4AMT + 1 == P_FM1_ATK && P_FM4_LEVEL + 1 == P_CHRD && P_VOIC + 1 == P_LN0 &&
                  P_LN7 + 1 == P_LSYNC && P_LSYNC + 3 == P_SQNT && P_SQNT + 1 == P_SPRD && P_SPRD + 1 == P_ITYPE &&
                  P_ITYPE + 4 == P_IMIX && P_IMIX + 1 == P_FTYPE && P_FTYPE + 1 == P_ESYNC && P_ESYNC + 1 == P_ATSNS && P_ATSNS + 3 == P_RUDION &&
-                 P_RUDION + 11 == P_E0 && P_E0 == 117 && PROJ_NP_SAVE == P_COUNT && PROJ_NP_SAVE == 125u &&   /* 1.8: rudiments are saved too */
-                 P_COUNT == PROJ_NP_V3 + 68u && PROJ_NP_V3 == PROJ_NP_V2 + 4u);
+                 P_RUDION + 13 == P_E0 && P_E0 == 119 && PROJ_NP_SAVE == P_COUNT && PROJ_NP_SAVE == 127u &&   /* 1.8: rudiments are saved too;
+                                                                                                             * r0.1.7: CHAIN, REPS */
+                 P_COUNT == PROJ_NP_V3 + 70u && PROJ_NP_V3 == PROJ_NP_V2 + 4u);
     bad += check("FUN10 fits one flash object, the retained cache in NOINIT", sizeof(project_store_t) <= 4096u - 256u &&
                  sizeof(project_store_t) == 3840u && 0xC8u + 4u * sizeof(project_store_t) <= 0x3D50u);
 
@@ -420,9 +421,10 @@ int main(void)
         project_t a, c;
         project_store_t st, st2;
         uint32_t i, zero = 1;
-        bad += check("FUN10 name at the end of the reserved tail, the FM6 patches before it, after the data (10 spare, room for 2 more track params)",
+        bad += check("FUN10 name at the end of the reserved tail, the FM6 patches before it, after the data and the packs (1 spare, MIDI IN's 3)",
                      PROJ_NAME_OFF == 3824u && PROJ_FM6_OFF == 3312u && 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) +
-                     sizeof(chain_config_t) + sizeof(motion_store_t) + 4u + 4u == PROJ_FM6_OFF);
+                     sizeof(chain_config_t) + sizeof(motion_store_t) + PROJ_PACK_BYTES + 1u + 3u == PROJ_FM6_OFF &&
+                     PROJ_PACK_BYTES == 68u && MOTION_MAX == 88u);
         memset(&a, 0, sizeof a);
         a.magic = PROJ_MAGIC; a.size = sizeof a; a.parts = NPART; a.phys = PROJ_PHYS;
         chain_defaults(&a.chain);
@@ -686,6 +688,62 @@ int main(void)
         ok = proj_import(&c, &buf, (int)sizeof w4) && PERC_OK(c);
         bad += check("FUN4 with a SAMPLE PERC track: DRUM's kit, the same", ok);
 #undef PERC_OK
+    }
+    {   /* RudiSeq PACK (r0.1.7): the packs after the motion block (PROJ_FL_PACK); a FUN10 without the flag (r0.1.6 and
+         * before: a 112-record motion block, no packs) loads with its first 88 records */
+        project_t a, c;
+        project_store_t st, old;
+        uint32_t mpos = 68u + NTRK * (PROJ_NP_SAVE + 2u + NSTEP * 9u) + sizeof(chain_config_t), sum;
+        memset(&a, 0, sizeof a);
+        a.magic = PROJ_MAGIC; a.size = sizeof a; a.parts = NPART; a.phys = PROJ_PHYS;
+        chain_defaults(&a.chain);
+        for (t = 0; t < NTRK; t++) {
+            for (i = 0; i < P_COUNT; i++)
+                a.t[t].p[i] = param_desc_of(ENGI_ANALOG, i)->def;
+            memcpy(a.fm6[t], FM6_INIT, FM6_PACKED);
+            for (i = 0; i < RUDI_PACK; i++)
+                a.pack[t][i] = (uint8_t)((t * 40u + i * 11u) % NUM_RUDIMENTS);
+            a.pack[t][RUDI_PACK] = (uint8_t)(16u - 5u * t);
+        }
+        a.t[1].p[P_RUDCH] = 2; a.t[1].p[P_RUDREP] = 5;
+        a.motion.count = MOTION_MAX;
+        for (i = 0; i < MOTION_MAX; i++)
+            a.motion.event[i] = (motion_event_t){(uint8_t)((i & 3u) << 6 | (i / 4u)), P_PAN, (int8_t)(i % 100u)};   /* (track, step) once each */
+        a.sum = proj_sum(&a);
+        ok = proj_pack(&st, &a) && (st.raw[67] & PROJ_FL_PACK) && st.raw[66] == 127u && proj_import(&c, &st, sizeof st);
+        for (t = 0; t < NTRK && ok; t++)
+            ok &= !memcmp(c.pack[t], a.pack[t], RUDI_PACK + 1u);
+        bad += check("PACK: FUN10 with the flag: the four packs and their counts round trip, 88 motion records with them, CHAIN and REPS too",
+                     ok && c.t[1].p[P_RUDCH] == 2 && c.t[1].p[P_RUDREP] == 5 && c.motion.count == MOTION_MAX &&
+                     !memcmp(&c.motion, &a.motion, sizeof a.motion));
+        a.pack[2][RUDI_PACK] = RUDI_PACK + 1u;
+        bad += check("PACK: a count past 16 cannot be packed", !proj_pack(&st, &a));
+        a.pack[2][RUDI_PACK] = 3u; a.pack[2][0] = NUM_RUDIMENTS;
+        bad += check("PACK: a slot past the rudiments cannot be packed", !proj_pack(&st, &a));
+        a.pack[2][0] = 0;
+        ok = proj_pack(&st, &a);
+        old = st;                                       /* r0.1.6's layout: 340 bytes of motion (112 records), no flag */
+        memset(old.raw + mpos, 0, PROJ_MOTION_V112);
+        old.raw[mpos] = 100; old.raw[mpos + 1u] = a.motion.on;   /* 100 records: 12 more than today's 88 */
+        for (i = 0; i < 100u; i++) {
+            motion_event_t e = {(uint8_t)((i & 3u) << 6 | (i / 4u)), P_PAN, (int8_t)(i % 100u)};
+            memcpy(old.raw + mpos + 4u + 3u * i, &e, 3u);
+        }
+        old.raw[67] = 0;
+        sum = proj_hash(old.raw, PROJ_STORE_SIZE - 4u); memcpy(old.raw + PROJ_STORE_SIZE - 4u, &sum, 4);
+        ok = ok && proj_import(&c, &old, sizeof old) && c.motion.count == MOTION_MAX && c.motion.on == a.motion.on;
+        for (i = 0; i < MOTION_MAX && ok; i++)
+            ok &= !memcmp(&c.motion.event[i], &a.motion.event[i], 3u);
+        for (t = 0; t < NTRK && ok; t++)
+            ok &= c.pack[t][RUDI_PACK] == 0u;
+        bad += check("PACK: a FUN10 without the flag (r0.1.6 and before): its first 88 motion records load, the rest dropped, no packs",
+                     ok && c.t[1].p[P_RUDCH] == 2);
+        old.raw[66] = 125; old.raw[67] = 0;             /* (r0.1.6 wrote 125 parameters: the two new ones take their defaults) */
+        sum = proj_hash(old.raw, PROJ_STORE_SIZE - 4u); memcpy(old.raw + PROJ_STORE_SIZE - 4u, &sum, 4);
+        ok = proj_import(&c, &old, sizeof old);         /* (the bytes after the 125th parameter shift: this only checks it is refused
+                                                         * or loads whole, never half) */
+        bad += check("PACK: a store of 125 parameters is read by count (loads or is refused as a whole, nothing half)",
+                     !ok || (proj_ok(&c) && motion_valid(&c.motion)));
     }
     printf("%s\n", bad ? "PROJECT FORMAT TEST FAILED" : "project format test passed");
     return bad != 0;

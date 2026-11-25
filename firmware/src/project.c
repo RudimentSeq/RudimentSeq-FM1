@@ -116,6 +116,16 @@
  * stored-byte range, so proj_pack / proj_unpack widen the biased byte to -64..191 (0..255 unsigned; the
  * whole-store hash already guards integrity). A project now stores the whole P_COUNT. */
 #define PROJ_NP_SAVE P_COUNT                   /* a project stores every parameter, rudiments included */
+/* RudiSeq PACK (2026-11-25, r0.1.7): CHAIN and REPS made P_COUNT 127 (8 more bytes), and each track's pack of rudiments,
+ * 16 slots and a count, is 68 more. The motion store shrank from 112 to 88 records (MOTION_MAX, 72 bytes) for them: the
+ * packs follow the motion block, inside the 340 bytes a 112-record block took, and byte 67 (format flags, always 0
+ * before) says so (PROJ_FL_PACK). A FUN10 without the flag (r0.1.6 and before, 125 parameters or fewer) still holds a
+ * 112-record block (PROJ_MOTION_V112; 1.8 to r0.1.3 wrote 114-record blocks of 346 bytes, which the count check below
+ * takes as well): its first 88 records load, the rest are dropped (proj_motion_old), and its tracks have no pack.
+ * Firmware before this refuses a project of 127 parameters (np > its P_COUNT), as every parameter added before */
+#define PROJ_FL_PACK 1u                        /* byte 67 bit 0: an 88-record motion block, then NTRK x (RUDI_PACK + 1) pack bytes */
+#define PROJ_MOTION_V112 340u                  /* the motion block of a FUN10 without the flag (4 + 112 x 3) */
+#define PROJ_PACK_BYTES (NTRK * (RUDI_PACK + 1u))
 #define PROJ_PHYS 2u                           /* project_t.phys: PHYS without DUST and DRUM (see the top) */
 #define PROJ_NAME_LEN 12u                      /* the name: FUN7 bytes PROJ_NAME_OFF.. (the reserved tail's end) */
 typedef struct {                               /* one track */
@@ -136,6 +146,7 @@ typedef struct {
     motion_store_t motion;
     uint8_t fm6[NTRK][FM6_PACKED];             /* each track's FM6 patch, packed (eng_fm6.c) */
     uint8_t mch[NTRK];                         /* 1.5.5: MIDI IN TRACK's channels, as song.mch (PROJ_MIDI_OFF) */
+    uint8_t pack[NTRK][RUDI_PACK + 1u];        /* RudiSeq PACK (2026-11-25): each track's pack of rudiments and, last, its count */
     char name[PROJ_NAME_LEN];                  /* the project's name: upper-case ASCII 32..126, 0-padded; "" = none */
     uint32_t sum;
 } project_t;
@@ -659,9 +670,17 @@ static int proj_pack(project_store_t *out, const project_t *q)
             b[pos++] = (uint8_t)(s->probability | (r >> 1) << 7);
         }
     }
-    if (pos + sizeof q->chain + sizeof q->motion > PROJ_MIDI_OFF) return 0;
+    if (pos + sizeof q->chain + sizeof q->motion + PROJ_PACK_BYTES > PROJ_MIDI_OFF) return 0;
     memcpy(b + pos, &q->chain, sizeof q->chain); pos += sizeof q->chain;
-    memcpy(b + pos, &q->motion, sizeof q->motion);
+    memcpy(b + pos, &q->motion, sizeof q->motion); pos += sizeof q->motion;
+    for (t = 0; t < NTRK; t++) {                        /* RudiSeq PACK: the packs after the motion (PROJ_FL_PACK) */
+        if (q->pack[t][RUDI_PACK] > RUDI_PACK) return 0;
+        for (i = 0; i <= RUDI_PACK; i++) {
+            if (i < RUDI_PACK && q->pack[t][i] >= NUM_RUDIMENTS) return 0;
+            b[pos++] = q->pack[t][i];
+        }
+    }
+    b[67] = PROJ_FL_PACK;
     proj_midi_pack(b, q);
     memcpy(b + PROJ_FM6_OFF, q->fm6, sizeof q->fm6);
     {   /* the name (0-padded; stops at the first 0) */
@@ -710,11 +729,25 @@ static int proj_motion_v9(motion_store_t *m, const uint8_t *b)
 }
 /* a stored FUN10 (st = PROJ_STORE_SIZE), FUN9 (PROJ_STORE_V9: 64 motion records of 4 bytes, no nudges), FUN8
  * (PROJ_STORE_V8: FUN9 with its tail 64 bytes shorter) or FUN7 (PROJ_STORE_V7: no patches, the init one) */
+/* RudiSeq PACK: the motion block of a FUN10 without PROJ_FL_PACK (112 records since RUDI 3, 114 before; the same 4-byte
+ * head and 3-byte records as today's): the first MOTION_MAX of its records; more are dropped (a count past 114 fails
+ * motion_valid later, as it would have) */
+static void proj_motion_old(motion_store_t *m, const uint8_t *b)
+{
+    uint32_t n = b[0], i;
+    memset(m, 0, sizeof *m);
+    m->count = (uint8_t)(n > MOTION_MAX ? MOTION_MAX : n);
+    m->on = b[1];
+    for (i = 0; i < m->count; i++)
+        memcpy(&m->event[i], b + 4u + 3u * i, 3u);
+}
 static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
 {
     uint32_t pos = 68u, t, i, magic, size, sum, np = b[66], v7 = st == PROJ_STORE_V7, v10 = st == PROJ_STORE_SIZE;
     uint32_t name_off = st - 4u - PROJ_NAME_LEN, end = v7 ? name_off : name_off - NTRK * FM6_PACKED;
-    uint32_t mot = v10 ? sizeof q->motion : PROJ_MOTION_V9, chn = v10 ? sizeof q->chain : sizeof(chain_v9_t);
+    uint32_t pk = v10 && (b[67] & PROJ_FL_PACK) != 0u;   /* RudiSeq PACK: an 88-record motion block, then the packs */
+    uint32_t mot = !v10 ? PROJ_MOTION_V9 : pk ? sizeof q->motion + PROJ_PACK_BYTES : PROJ_MOTION_V112;
+    uint32_t chn = v10 ? sizeof q->chain : sizeof(chain_v9_t);
     memcpy(&magic, b, 4); memcpy(&size, b + 4, 4); memcpy(&sum, b + st - 4u, 4);
     if (magic != (v7 ? PROJ_MAGIC_V7 : st == PROJ_STORE_V8 ? PROJ_MAGIC_V8 : st == PROJ_STORE_V9 ? PROJ_MAGIC_V9 : PROJ_MAGIC) ||
         size != st || sum != proj_hash(b, st - 4u) ||
@@ -757,9 +790,19 @@ static int proj_unpack(project_t *q, const uint8_t *b, uint32_t st)
         if (!chain_from_v9(&q->chain, &c9)) return 0;
     }
     pos += chn;
-    if (v10)
+    if (v10 && pk) {
         memcpy(&q->motion, b + pos, sizeof q->motion);
-    else if (!proj_motion_v9(&q->motion, b + pos))
+        pos += sizeof q->motion;
+        for (t = 0; t < NTRK; t++) {                    /* the packs: a slot past the rudiments or a count past 16 is no project */
+            for (i = 0; i <= RUDI_PACK; i++)
+                q->pack[t][i] = b[pos++];
+            if (q->pack[t][RUDI_PACK] > RUDI_PACK) return 0;
+            for (i = 0; i < RUDI_PACK; i++)
+                if (q->pack[t][i] >= NUM_RUDIMENTS) return 0;
+        }
+    } else if (v10) {
+        proj_motion_old(&q->motion, b + pos);           /* (r0.1.6 and before: 112 or 114 records, the first 88 kept) */
+    } else if (!proj_motion_v9(&q->motion, b + pos))
         return 0;
     if (!proj_motion_ids(&q->motion, np) || !chain_valid(&q->chain) || !motion_valid(&q->motion)) return 0;
     if (v10)
@@ -922,6 +965,10 @@ static void project_capture(project_t *p)
     }
     p->motion = motion;
     memcpy(p->mch, song.mch, sizeof p->mch);
+    for (i = 0; i < NTRK; i++) {                        /* RudiSeq PACK: each track's pack and its count */
+        memcpy(p->pack[i], trk[i].pack, RUDI_PACK);
+        p->pack[i][RUDI_PACK] = trk[i].npack;
+    }
     motion_unguard(f);
     memcpy(p->name, proj_name, str_len(proj_name));
     p->sum = proj_sum(p);
@@ -1147,6 +1194,9 @@ static int project_restore_runtime(const project_t *input)
         t->preset = (uint8_t)(ENGINES[e]->npresets ? (s->preset >= PROJ_DEF_KEEP ? 0u : s->preset) % ENGINES[e]->npresets : 0u);
         memcpy(t->step, s->step, sizeof t->step);
         proj_steps(t->step);
+        for (i = 0; i < RUDI_PACK; i++)                 /* RudiSeq PACK (a project before it: no pack) */
+            t->pack[i] = (uint8_t)(p->pack[k][i] % NUM_RUDIMENTS);
+        t->npack = (uint8_t)(p->pack[k][RUDI_PACK] > RUDI_PACK ? RUDI_PACK : p->pack[k][RUDI_PACK]);
         {   /* the project's own FM6 patch, never reloaded from SLOT: F n if it is that factory patch, else OWN */
             uint8_t v[FP_SIZE + 1u];
 #if FELUCCA_PLUGINS

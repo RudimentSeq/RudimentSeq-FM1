@@ -96,6 +96,8 @@ static void tl_undo_take(track_t *t)
     undo.user = t->user;
     memcpy(undo.p, t->p, sizeof undo.p);
     memcpy(undo.step, t->step, sizeof undo.step);
+    memcpy(undo.pack, t->pack, RUDI_PACK);              /* (RudiSeq PACK: the pack too) */
+    undo.pack[RUDI_PACK] = t->npack;
     memcpy(undo.fm6, fm6_patch[i], FP_SIZE);
     undo.fm6_slot = fm6_slot[i];
     undo.pat = pat_sig[i];

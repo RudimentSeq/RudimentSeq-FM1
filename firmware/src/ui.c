@@ -636,6 +636,20 @@ static int rudi_keys_on(void)
     return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_RUDI && TSEL->p[P_RUDION] != 0;
 }
 static int rudi_bank_shown(void) { return rk.on && rk.show && fm1_ms - rk.show < RK_SHOW_MS; }
+/* RudiSeq PACK (2026-11-25; ui_input.c pack_keys, ui_graph.c graph_pack): on the PACK page while RUDI is on the keys are
+ * the pack's: a white key jumps the lane to that slot, black key 1 shuffles the pack, black key 2 deals 16 new; REC
+ * tapped there fills it: the keys are the bank's rudiments then (rk's bank, as RUDI KEYS) and each tap writes the next
+ * slot, the 16th, REC again or leaving the page ends it (nothing tapped: the pack as it was) */
+static struct {
+    uint8_t fill;                /* filling: slot n of track trk is written next */
+    uint8_t n, trk;
+    uint32_t rng;                /* the UI's dice (a shuffle, a deal; the lane's are the ISR's) */
+} pk;
+static int pack_page_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && cur_page()->graph == GR_PACK && TSEL->p[P_RUDION] != 0;
+}
+static int pack_keys_on(void) { return !ui.layer && pack_page_on(); }
 
 /* black key place p (seq.c key_place) held, 0 = not */
 static int black_held(uint32_t p)
@@ -906,6 +920,7 @@ static struct {
     uint8_t fm6[FP_SIZE + 1u];   /* patch is the track's own, not a factory one */
     int16_t p[P_COUNT];
     step_t step[NSTEP];
+    uint8_t pack[RUDI_PACK + 1u];   /* RudiSeq PACK: the track's pack and its count (swapped with the steps) */
     motion_store_t motion_backup; /* one track only, swaps with the shared event pool on undo */
     uint32_t after;              /* track_sig right after the last load */
     uint32_t pat;                /* pat_sig[] of the copy */
@@ -1030,6 +1045,8 @@ static void load_begin(track_t *t, uint32_t what)
     undo.user = t->user;
     memcpy(undo.p, t->p, sizeof undo.p);
     memcpy(undo.step, t->step, sizeof undo.step);
+    memcpy(undo.pack, t->pack, RUDI_PACK);
+    undo.pack[RUDI_PACK] = t->npack;
     memcpy(undo.fm6, fm6_patch[i], FP_SIZE);
     undo.fm6_slot = fm6_slot[i];
     undo.pat = pat_sig[i];
@@ -1089,6 +1106,8 @@ static void edit_undo_take(track_t *t, uint32_t tag, uint32_t what)
     undo.user = t->user;
     memcpy(undo.p, t->p, sizeof undo.p);
     memcpy(undo.step, t->step, sizeof undo.step);
+    memcpy(undo.pack, t->pack, RUDI_PACK);
+    undo.pack[RUDI_PACK] = t->npack;
     memcpy(undo.fm6, fm6_patch[i], FP_SIZE);
     undo.fm6_slot = fm6_slot[i];
     undo.pat = pat_sig[i];
@@ -1177,6 +1196,16 @@ static void undo_swap(void)
             step_t s = t->step[i];
             t->step[i] = undo.step[i];
             undo.step[i] = s;
+        }
+        for (i = 0; i < RUDI_PACK; i++) {         /* RudiSeq PACK: the pack and its count too */
+            uint8_t v = t->pack[i];
+            t->pack[i] = undo.pack[i];
+            undo.pack[i] = v;
+        }
+        {
+            uint8_t v = t->npack;
+            t->npack = undo.pack[RUDI_PACK];
+            undo.pack[RUDI_PACK] = v;
         }
     }
     fm1_irq_on();

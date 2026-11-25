@@ -389,6 +389,69 @@ static void graph_scale(const track_t *t, uint16_t c)
  * right hand up / left hand down from a baseline, accents taller, graces
  * short, rests a dot, a tick under each beat; the hit playing in the accent
  * colour. Off, the strip still previews what RUDMT would play. */
+/* RudiSeq RUDI KEYS: the bank's 16 names in place of the strip, two columns of eight (the keys' letters; rud's filled,
+ * the empty ones dark); the bank: rk's (the lit black key) */
+static void graph_bank(uint32_t rud)
+{
+    static const char KEY[RK_BANK] = {'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G'};
+    uint32_t j;
+    for (j = 0; j < RK_BANK; j++) {
+        uint32_t r = rk.bank * RK_BANK + j;
+        int32_t cx = 10 + 112 * (int32_t)(j / 8u), cy = 2 + 13 * (int32_t)(j % 8u);
+        int here = r == rud;
+        uint16_t fill = here ? T_THEME : T_RAISE, ink = here ? T_INK : r < NUM_RUDIMENTS ? T_TEXT : T_DIM;
+        char lt[2] = {KEY[j], 0};
+        cv_rrect(cx, cy, 106, 12, 3, fill, T_SURF);
+        GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
+        cv_text_on(cx + 4, cy + CAP_IN(S, 12), &AF_S, lt, here ? T_INK : T_MID, fill);
+        if (r < NUM_RUDIMENTS) {
+            GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
+            cv_text_r(cx + 102, cy + CAP_IN(S, 12), &AF_S, RUDIMENTS[r].sname, ink, fill);
+        }
+    }
+}
+/* RudiSeq PACK (ui.c pk, ui_input.c pack_keys): the track's pack, 16 slots in two columns of eight: the slot's number and
+ * its rudiment's short name, the slot playing filled (CHAIN on; off: the first slot holding RUDMT), the empty ones dark.
+ * Filling: the bank the keys pick from (graph_bank; the top bar names each slot written). No pack yet: how to make one */
+static void graph_pack(const track_t *t, uint16_t c)
+{
+    uint32_t j, pos = rudi_pack_pos(t), rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
+    (void)c;
+    if (t == TSEL && pk.fill) {
+        graph_bank(rud);
+        return;
+    }
+    if (!t->npack) {
+        cv_text(10, 2, &AF_S, "EMPTY PACK", T_MID);
+        cv_text(10, 16, &AF_M, t->p[P_RUDION] ? "[REC] THEN TAP RUDIMENTS" : "RUDI OFF: SEE RUDI [K1]", T_TEXT);
+        cv_text(10, 36, &AF_S, "WHITE KEYS: 16 OF THE BANK", T_MID);
+        cv_text(10, 48, &AF_S, "BLACK KEYS: THE BANK", T_MID);
+        cv_text(10, 60, &AF_S, "[REC] AGAIN OR THE 16TH ENDS IT", T_MID);
+        cv_text(10, 78, &AF_S, "THEN: A WHITE KEY JUMPS TO ITS SLOT", T_MID);
+        cv_text(10, 90, &AF_S, "F#3 SHUFFLES IT, G#3 DEALS 16 NEW", T_MID);
+        return;
+    }
+    if (pos == 0xFFu)                                /* CHAIN off: the slot RUDMT is in, if any */
+        for (j = 0; j < t->npack; j++)
+            if (t->pack[j] == rud) {
+                pos = j;
+                break;
+            }
+    for (j = 0; j < RUDI_PACK; j++) {
+        int32_t cx = 10 + 112 * (int32_t)(j / 8u), cy = 2 + 13 * (int32_t)(j % 8u);
+        int used = j < t->npack, here = j == pos;
+        uint16_t fill = here ? T_THEME : T_RAISE, ink = here ? T_INK : used ? T_TEXT : T_DIM;
+        char nb[4];
+        fmt_int(nb, (int32_t)j + 1);
+        cv_rrect(cx, cy, 106, 12, 3, fill, T_SURF);
+        GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "pack row on its middle");
+        cv_text_on(cx + 4, cy + CAP_IN(S, 12), &AF_S, nb, here ? T_INK : T_MID, fill);
+        if (used) {
+            GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "pack row on its middle");
+            cv_text_r(cx + 102, cy + CAP_IN(S, 12), &AF_S, RUDIMENTS[t->pack[j] % NUM_RUDIMENTS].sname, ink, fill);
+        }
+    }
+}
 static void graph_rudi(const track_t *t, uint16_t c)
 {
     uint32_t rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
@@ -419,25 +482,8 @@ static void graph_rudi(const track_t *t, uint16_t c)
     cv_text_r(228, 2, &AF_S, b, T_MID, T_SURF);
     cv_text(10, 16, &AF_M, rd->name, T_TEXT);
 bank:
-    if (t == TSEL && rudi_bank_shown()) {            /* RudiSeq RUDI KEYS: the bank's 16 names in place of the strip,
-                                                      * two columns of eight (the keys' letters; RUDMT's filled, the
-                                                      * empty ones dark); the bank: the lit black key */
-        static const char KEY[RK_BANK] = {'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G'};
-        uint32_t j;
-        for (j = 0; j < RK_BANK; j++) {
-            uint32_t r = rk.bank * RK_BANK + j;
-            int32_t cx = 10 + 112 * (int32_t)(j / 8u), cy = 2 + 13 * (int32_t)(j % 8u);
-            int here = r == rud;
-            uint16_t fill = here ? T_THEME : T_RAISE, ink = here ? T_INK : r < NUM_RUDIMENTS ? T_TEXT : T_DIM;
-            char lt[2] = {KEY[j], 0};
-            cv_rrect(cx, cy, 106, 12, 3, fill, T_SURF);
-            GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
-            cv_text_on(cx + 4, cy + CAP_IN(S, 12), &AF_S, lt, here ? T_INK : T_MID, fill);
-            if (r < NUM_RUDIMENTS) {
-                GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
-                cv_text_r(cx + 102, cy + CAP_IN(S, 12), &AF_S, RUDIMENTS[r].sname, ink, fill);
-            }
-        }
+    if (t == TSEL && rudi_bank_shown()) {            /* RudiSeq RUDI KEYS: the bank in place of the strip */
+        graph_bank(rud);
         return;
     }
 
@@ -2373,6 +2419,9 @@ static void draw_graph(void)
             break;
         case GR_RUDI:
             graph_rudi(t, c);
+            break;
+        case GR_PACK:
+            graph_pack(t, c);
             break;
         case GR_CHORD:
             cv_oy = 0;

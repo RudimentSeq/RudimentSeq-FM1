@@ -108,21 +108,23 @@ static int page_cycle(void)
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "RUDI 3") && cur_page()->graph == GR_RUDI;   /* (2026-11-18) */
     press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "PACK") && cur_page()->graph == GR_PACK;   /* (2026-11-25) */
+    press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "DETAIL") && detail_on() && cur_page()->graph == GR_ROLL && ui.cursor == 4u &&
           song.seq_mode;
     press(B_SEQ); frames(320);
     ok &= cur_page()->graph == GR_EVENTS && !detail_on();
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "STEP") && !detail_on();
-    bad += check("SEQ: STEP -> RUDI -> RUDI 2 -> DETAIL (the same cursor) -> AUTOMATION -> STEP", ok);
+    bad += check("SEQ: STEP -> RUDI -> RUDI 2 -> RUDI 3 -> PACK -> DETAIL (the same cursor) -> AUTOMATION -> STEP", ok);
     go_detail();
     {
         char ti[20];
         page_title(ti);
-        ok = str_eq(ti, "DETAIL 5/6");   /* (2026-11-18: RUDI 3 before it) */
+        ok = str_eq(ti, "DETAIL 6/7");   /* (2026-11-18: RUDI 3 before it; 2026-11-25: PACK) */
     }
     ok &= help_page() && str_eq(help_page(), "[PRESETS]STEP[K1]CHANCE, 1:4, FILL");
-    bad += check("  its footer title DETAIL 5/6 (not the scale), its HELP hint", ok);
+    bad += check("  its footer title DETAIL 6/7 (not the scale), its HELP hint", ok);
     return bad;
 }
 

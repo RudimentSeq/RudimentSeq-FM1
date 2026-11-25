@@ -74,10 +74,13 @@ track's aftertouch, the keys' or MIDI's, routed as a modulation slot of its own.
 changed; an editor that takes P_COUNT and P_E0 from `INFO` keeps working. Projects stay FUN10 (114 at byte 66; 4 bytes
 to spare before MIDI IN TRACK's three).
 
-**RudimentSeq (125 parameters, FUN10 as it was):** the fork's eleven track parameters sit before the engine's eight:
+**RudimentSeq (127 parameters, FUN10 with a flag):** the fork's thirteen track parameters sit before the engine's eight:
 `RUDI` (106: OFF, 1X..4X), `RUDMT` (107), `PRB R` / `PRB L` (108, 109), `SMART` (110), `FTHR` (111), `NTE R` / `NTE L`
-(112, 113), `RNG R` / `RNG L` (114, 115: 0..24) and `CHG` (116: %): P_COUNT 125, P_E0 117. No command changed; an editor
-that takes P_COUNT and P_E0 from `INFO` keeps working. Projects stay FUN10 (125 at byte 66; MOTION_MAX 112).
+(112, 113), `RNG R` / `RNG L` (114, 115: 0..24), `CHG` (116: %), `CHAIN` (117: OFF, ON, RESHUF) and `REPS` (118: 1..8):
+P_COUNT 127, P_E0 119. No command changed; an editor that takes P_COUNT and P_E0 from `INFO` keeps working. Projects stay
+FUN10 (127 at byte 66); since r0.1.7 byte 67 bit 0 says the motion block holds 88 records (MOTION_MAX, 112 before) and the
+four tracks' packs of rudiments (17 bytes each: 16 slots, the count) follow it; a project without the flag loads with its
+first 88 records and no packs. The packs are not in the editor's protocol (a BACKUP carries them inside the project).
 
 ## Framing
 

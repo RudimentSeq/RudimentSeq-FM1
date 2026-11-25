@@ -20,6 +20,8 @@ typedef struct {
     uint8_t sounding;   /* the note held until the next step + 1, 0: none */
     uint8_t skip;       /* track steps still to pass before the lane's next step (RUDI 2X..4X; 1X: always 0) */
     uint8_t cur[2];     /* RUDI 3: the hand's last random note + 1 (0: none yet); kept on 100 - CHG % of its hits */
+    uint8_t pos;        /* PACK: the slot playing (CHAIN on: the lane moves to the next after REPS passes) */
+    uint8_t pass;       /* .. passes of it done */
     uint32_t rng;
 } rudi_lane_t;
 static rudi_lane_t rudi[NTRK];
@@ -120,6 +122,52 @@ static void rudi_hush(track_t *t)                  /* the held note off (stop, m
     }
 }
 
+/* PACK (2026-11-25): the track's pack of rudiments (track_t pack[npack]), walked when CHAIN (P_RUDCH) is on: after REPS
+ * passes of the slot playing the next slot's rudiment becomes RUDMT (the sticking starts from its top, as a knob turn);
+ * past the last slot the first again, and with RESHUF the pack is shuffled first, so no lap repeats the order. The
+ * UI's own writes (the PACK page: fill, jump, shuffle, deal; ui_input.c pack_keys) are bytes, and the lane reads
+ * pack[pos % npack] once a pass: nothing is half seen */
+static void rudi_pack_shuffle(track_t *t, rudi_lane_t *r)   /* Fisher-Yates with the lane's dice */
+{
+    uint32_t i, n = t->npack;
+    for (i = n; i > 1u; i--) {
+        uint32_t j = rudi_rand(r) % i;
+        uint8_t v = t->pack[i - 1u];
+        t->pack[i - 1u] = t->pack[j];
+        t->pack[j] = v;
+    }
+}
+static void rudi_pack_take(track_t *t, rudi_lane_t *r, uint32_t slot)   /* slot's rudiment plays: RUDMT */
+{
+    uint32_t rud;
+    if (!t->npack)
+        return;
+    r->pos = (uint8_t)(slot % t->npack);
+    r->pass = 0;
+    rud = (uint32_t)t->pack[r->pos] % NUM_RUDIMENTS;
+    t->p[P_RUDI] = (int16_t)rud;
+}
+static void rudi_pack_step(track_t *t, rudi_lane_t *r)   /* a pass of the rudiment ended (its hit 0 is next) */
+{
+    if (!t->p[P_RUDCH] || !t->npack)
+        return;
+    if (++r->pass < (uint32_t)(t->p[P_RUDREP] > 0 ? t->p[P_RUDREP] : 1))
+        return;
+    r->pass = 0;
+    r->pos = (uint8_t)((r->pos + 1u) % t->npack);
+    if (r->pos == 0u && t->p[P_RUDCH] == 2)         /* RESHUF: a new order every lap */
+        rudi_pack_shuffle(t, r);
+    r->lastrud = (uint8_t)((uint32_t)t->pack[r->pos] % NUM_RUDIMENTS);   /* (hit is 0: no restart needed) */
+    t->p[P_RUDI] = (int16_t)r->lastrud;
+}
+/* the UI (main loop): the slot playing, 0xFF when CHAIN is off or the pack is empty */
+static uint32_t rudi_pack_pos(const track_t *t)
+{
+    const rudi_lane_t *r = &rudi[trk_index(t)];
+    return t->p[P_RUDCH] && t->npack ? r->pos % t->npack : 0xFFu;
+}
+static void rudi_pack_jump(track_t *t, uint32_t slot) { rudi_pack_take(t, &rudi[trk_index(t)], slot); }
+
 static void rudi_restart(void)                     /* PLAY: every rudiment from its hit 0, scene 1 */
 {
     uint32_t i;
@@ -130,6 +178,9 @@ static void rudi_restart(void)                     /* PLAY: every rudiment from 
         rudi[i].sstep = 0;
         rudi[i].skip = 0;
         rudi[i].cur[0] = rudi[i].cur[1] = 0;
+        rudi[i].pass = 0;
+        if (trk[i].p[P_RUDCH] && trk[i].npack)     /* PACK: a lap from its first slot */
+            rudi_pack_take(&trk[i], &rudi[i], 0);
         rudi[i].lastrud = (uint8_t)((uint32_t)trk[i].p[P_RUDI] % NUM_RUDIMENTS);
     }
 }
@@ -173,6 +224,8 @@ static __attribute__((noinline)) void rudi_step(track_t *t)
     h = &rd->hits[r->hit % rd->nHits];
     RUDI_STAT_STEP(trk_index(t));
     r->hit = (uint8_t)((r->hit + 1u) % rd->nHits);
+    if (r->hit == 0u)                              /* the pass ends with this hit: the PACK's next (CHAIN on) */
+        rudi_pack_step(t, r);
     r->sstep = (uint8_t)((r->sstep + 1u) & 127u);  /* the smart clock runs through rests */
     rudi_hush(t);                                  /* the last hit's gate: one step */
     if (h->hand < 0)

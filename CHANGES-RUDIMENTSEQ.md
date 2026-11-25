@@ -48,6 +48,31 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-25: PACK, a pack of rudiments the lane walks (r0.1.7)
+
+- `core.h` track_t pack[16] / npack: each track's pack of rudiments; P_RUDCH CHAIN (OFF / ON / RESHUF) and P_RUDREP REPS
+  (1..8), the two last parameter ids there can be (P_COUNT 127: a motion record's id has 7 bits). `rudi.c` rudi_pack_step:
+  when a pass of the rudiment ends (its hit 0 is next) and CHAIN is on, after REPS passes the next slot's rudiment becomes
+  RUDMT; past the last slot the first again, RESHUF shuffling the pack first (the lane's dice). rudi_restart: PLAY starts a
+  lap from slot 1. rudi_pack_jump / rudi_pack_pos for the UI.
+- `params.c`: the PACK page after RUDI 3 (CHAIN, REPS; GR_PACK). `ui.c` pk, pack_page_on / pack_keys_on (song.grid 5: the
+  keys silent, `ui_name.c` keys_mode, `seq.c` keyboard_block). `ui_input.c` pack_keys: REC tapped on the page fills the
+  pack (rec_tap; no arming): the white keys are the bank's rudiments as in RUDI KEYS (rk's bank, the black keys change
+  it), each tap writes the next slot and plays it, the 16th, REC again, another page or track ends it (nothing tapped:
+  the pack stays). Not filling: a white key jumps to its slot (CHAIN off too), black key 1 shuffles (Fisher-Yates, the
+  UI's dice), black key 2 deals 16 different rudiments of the 174; each takes the undo copy first (pack_undo:
+  ui_tools.c tl_undo_take + undo.rudi). `ui.c` undo: the pack is copied with the steps and swapped with them (SAVE
+  held). pack_leds: the slot playing's white key (filling: the bank's). The REC LED lit while filling.
+- `ui_graph.c` graph_bank (the bank panel, out of graph_rudi), graph_pack: the 16 slots in two columns, numbered, the
+  slot playing filled (CHAIN off: the first slot holding RUDMT); filling: the bank; empty: how to fill it. `ui_help.c` PACK.
+- `project.c`: the packs are saved. MOTION_MAX 112 -> 88 (core.h) makes the room: byte 67 bit 0 (PROJ_FL_PACK) says the
+  motion block holds 88 records and the four packs (17 bytes each) follow it; a FUN10 without the flag (r0.1.6 and before)
+  loads its first 88 records (proj_motion_old) and no packs; 127 parameters by count. 1 byte to spare before MIDI IN's.
+- `core.h`: RUDISEQ_VERSION r0.1.7; track_t's pad (rsv_sz) resized. `web/editor.html`, `test_web.mjs`, `EDITOR_PROTOCOL.md`:
+  CHAIN, REPS (117, 118), P_COUNT 127, P_E0 119. `tests/ui_test.c` test_pack (9 checks), the SEQ page cycle has PACK;
+  `tests/project_test.c`: the layout, the pack round trip, an old block of 100 records loads 88; `tests/ui_render.c`:
+  pack, pack_fill, pack_empty.
+
 ## 2026-11-25: RUDI KEYS, the keyboard picks the rudiment (r0.1.6)
 
 - `ui.c` rk, rudi_keys_on: on a RUDI page while the selected track's RUDI is on the keys are the rudiments'

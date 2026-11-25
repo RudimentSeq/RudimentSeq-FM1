@@ -2785,7 +2785,8 @@ static int test_page_cycles(void)
     ok = 1;
     for (i = 0; i < NPAGES; i++) {                       /* every page in a family its button reaches, and its LED */
         uint32_t f = PAGES[i].fam;
-        ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS || PAGES[i].graph == GR_RUDI;   /* 1.8: RUDI pages */
+        ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS || PAGES[i].graph == GR_RUDI ||
+               PAGES[i].graph == GR_PACK;   /* 1.8: RUDI pages; 2026-11-25: PACK */
         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
         ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK");   /* HOME's: MIXER CLOCK */
         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
@@ -2795,7 +2796,7 @@ static int test_page_cycles(void)
     }
     for (i = 0; i < NPAGES; i++)
         ok &= !str_eq(PAGES[i].title, "PATTERN") && !str_eq(PAGES[i].title, "CHANCE") && !str_eq(PAGES[i].title, "AUTO LIST");
-    bad += check("1.2/1.8: SEQ is STEP, RUDI, RUDI 2, DETAIL, AUTOMATION; SONG is GLO's only page, PHRASES SAVE's, MIXER and CLOCK HOME's "
+    bad += check("1.2/1.8: SEQ is STEP, RUDI, RUDI 2, RUDI 3, PACK, DETAIL, AUTOMATION; SONG is GLO's only page, PHRASES SAVE's, MIXER and CLOCK HOME's "
                  "(their LED HOME)", ok);
     {   /* 1.2: GLOBAL and SYSTEM are gone; their knobs: BPM SWG CLK on HOME > CLOCK, TUNE and ROUT on no page (the MENU's),
          * MIDI CPU on none (INFO shows the USB state and the CPU); 1.8: SYNC (MIDI clock out) is CLOCK's fourth knob */
@@ -6906,12 +6907,14 @@ static int test_seq_tools(void)
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "RUDI 3");          /* (2026-11-18) */
     press(B_SEQ); frames(320);
+    ok &= str_eq(cur_page()->title, "PACK") && cur_page()->graph == GR_PACK;   /* (2026-11-25) */
+    press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "DETAIL") && cur_page()->graph == GR_ROLL;
     press(B_SEQ); frames(320);
     ok &= cur_page()->graph == GR_EVENTS && str_eq(cur_page()->title, "AUTOMATION");
     press(B_SEQ); frames(320);
     ok &= str_eq(cur_page()->title, "STEP");
-    bad += check("1.8: a tap on STEP cycles RUDI, RUDI 2, DETAIL, AUTOMATION, then STEP again (five SEQ pages)", ok);
+    bad += check("1.8: a tap on STEP cycles RUDI, RUDI 2, RUDI 3, PACK, DETAIL, AUTOMATION, then STEP again (seven SEQ pages)", ok);
     go_title("ENV"); frame();
     press(B_SEQ); frames(320);
     ok = str_eq(cur_page()->title, "STEP") && cur_page()->graph == GR_ROLL;   /* (the SEQ page shown last) */
@@ -7262,6 +7265,8 @@ static int test_layer_lock(void)
     ok &= str_eq(cur_page()->title, "RUDI 2") && !ui.lock && !ui.layer;
     press(B_SEQ); frames(400);
     ok &= str_eq(cur_page()->title, "RUDI 3") && !ui.lock && !ui.layer;   /* (2026-11-18) */
+    press(B_SEQ); frames(400);
+    ok &= str_eq(cur_page()->title, "PACK") && !ui.lock && !ui.layer;   /* (2026-11-25) */
     press(B_SEQ);                                        /* -> DETAIL */
     btn_down(B_SEQ); frames(500);
     ok &= ui.layer == LAYER_SEQ && !ui.lock;
@@ -10204,6 +10209,142 @@ static int test_style_max(void)                   /* RudiSeq: STYLE FLAT MAX / L
     return bad;
 }
 
+static uint32_t pack_steps(uint32_t passes)       /* rudi_step through `passes` passes of the rudiment playing (the chain may move it) */
+{
+    uint32_t i, n = 0;
+    while (passes--) {
+        uint32_t h = RUDIMENTS[(uint32_t)TSEL->p[P_RUDI] % NUM_RUDIMENTS].nHits;
+        for (i = 0; i < h; i++)
+            rudi_step(TSEL);
+        n += h;
+    }
+    return n;
+}
+static int pack_same_set(const uint8_t *a, const uint8_t *b, uint32_t n)   /* the same rudiments, in any order */
+{
+    uint32_t i, j, used = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++)
+            if (!((used >> j) & 1u) && a[i] == b[j]) break;
+        if (j == n) return 0;
+        used |= 1u << j;
+    }
+    return 1;
+}
+static int test_pack(void)                        /* RudiSeq PACK: the pack of rudiments the lane walks (CHAIN), filled from the keys */
+{
+    int bad = 0, ok;
+    uint32_t i, br, c, n;
+    uint8_t keep[RUDI_PACK];
+    ui_power_on();
+    tl_melody();
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 15;
+    go_page(GR_PACK); frame();
+    ok = song.grid == 5u && pack_keys_on() && !pk.fill && TSEL->npack == 0 && str_eq(cur_page()->title, "PACK") &&
+         cur_page()->id[0] == P_RUDCH && cur_page()->id[1] == P_RUDREP && TSEL->p[P_RUDCH] == 0 && TSEL->p[P_RUDREP] == 1;
+    tap_key(white(2));
+    ok &= msg_is("EMPTY PACK  [REC] FILLS") && TSEL->p[P_RUDI] == 15;
+    bad += check("PACK: SEQ's page after RUDI 3, CHAIN OFF and REPS 1; its keys are silent, an empty pack says so", ok);
+    press(B_REC); frames(20);
+    ok = pk.fill && pk.n == 0 && !song.rec && msg_is("TAP RUDIMENTS, REC ENDS");
+    key_down(white(3)); frame();
+    ok &= kb_note[white(3)] == KB_SILENT && TSEL->npack == 1 && TSEL->pack[0] == 3 && TSEL->p[P_RUDI] == 3 && !strncmp(ui.msg, "SLOT 1 ", 7);
+    key_up(white(3)); frame();
+    tap_key(white(5));
+    tap_key(black(2)); tap_key(white(0));
+    ok &= pk.n == 3 && TSEL->npack == 3 && TSEL->pack[0] == 3 && TSEL->pack[1] == 5 && TSEL->pack[2] == 32 && TSEL->p[P_RUDI] == 32 &&
+          rk.bank == 2 && ui.msg[0] == 'S' && ui.msg[5] == '3';
+    press(B_REC); frames(20);
+    ok &= !pk.fill && TSEL->npack == 3 && !song.rec && msg_is("3 IN THE PACK");
+    bad += check("PACK: REC fills it, not arming: each white key writes the next slot and plays it, the black keys the bank, REC ends it", ok);
+    TSEL->p[P_RUDCH] = 1;
+    rudi_restart();
+    ok = TSEL->p[P_RUDI] == 3 && rudi_pack_pos(TSEL) == 0;
+    pack_steps(1);
+    ok &= TSEL->p[P_RUDI] == 5 && rudi_pack_pos(TSEL) == 1;
+    pack_steps(1);
+    ok &= TSEL->p[P_RUDI] == 32;
+    pack_steps(1);
+    ok &= TSEL->p[P_RUDI] == 3 && rudi_pack_pos(TSEL) == 0;   /* a lap */
+    TSEL->p[P_RUDREP] = 2;
+    pack_steps(1);
+    ok &= TSEL->p[P_RUDI] == 3;
+    pack_steps(1);
+    ok &= TSEL->p[P_RUDI] == 5 && TSEL->pack[0] == 3 && TSEL->pack[1] == 5 && TSEL->pack[2] == 32;   /* (ON: the order stays) */
+    bad += check("PACK: CHAIN ON walks it, a slot after REPS passes of the one before, round again after the last", ok);
+    TSEL->p[P_RUDREP] = 1;
+    frame();
+    tap_key(white(1));
+    ok = TSEL->p[P_RUDI] == 5 && rudi_pack_pos(TSEL) == 1;
+    tap_key(white(10));
+    ok &= TSEL->p[P_RUDI] == 5 && msg_is("EMPTY SLOT");
+    c = key_leds(&br);
+    ok &= ((c >> white(1)) & 1u) && !((c >> white(0)) & 1u) && !((c >> white(2)) & 1u);
+    TSEL->p[P_RUDCH] = 0; frame();
+    tap_key(white(2));
+    ok &= TSEL->p[P_RUDI] == 32;                      /* (CHAIN off: the pack as favourites) */
+    c = key_leds(&br);
+    ok &= ((c >> white(2)) & 1u) && !((c >> white(1)) & 1u);
+    TSEL->p[P_RUDCH] = 1; frame();
+    bad += check("PACK: a white key jumps to its slot (CHAIN off too), an empty slot says so, the LED is the slot playing", ok);
+    memcpy(keep, TSEL->pack, RUDI_PACK);
+    tap_key(black(0));
+    ok = msg_is("PACK SHUFFLED") && TSEL->npack == 3 && pack_same_set(keep, TSEL->pack, 3) && str_eq(ui.msg2, "[SAVE] HOLD TO UNDO");
+    hold(B_SAVE); frame();
+    ok &= TSEL->npack == 3 && !memcmp(keep, TSEL->pack, 3);
+    tap_key(black(1));
+    ok &= msg_is("16 NEW IN THE PACK") && TSEL->npack == 16;
+    for (i = 0; i < 16u && ok; i++) {
+        uint32_t j;
+        ok &= TSEL->pack[i] < NUM_RUDIMENTS;
+        for (j = 0; j < i; j++)
+            ok &= TSEL->pack[j] != TSEL->pack[i];
+    }
+    hold(B_SAVE); frame();
+    ok &= TSEL->npack == 3 && !memcmp(keep, TSEL->pack, 3);
+    hold(B_SAVE); frame();
+    ok &= TSEL->npack == 16;                          /* (again: the deal back) */
+    bad += check("PACK: black key 1 shuffles it, black key 2 deals 16 different rudiments; SAVE held puts the pack back, again redoes", ok);
+    TSEL->p[P_RUDCH] = 2;                             /* RESHUF: a new order every lap */
+    memcpy(keep, TSEL->pack, RUDI_PACK);
+    rudi_restart();
+    ok = TSEL->p[P_RUDI] == keep[0];
+    for (i = 0; i < 15u; i++) {
+        pack_steps(1);
+        ok &= TSEL->p[P_RUDI] == keep[i + 1u] && TSEL->pack[i + 1u] == keep[i + 1u];   /* (shuffled only at the lap's end) */
+    }
+    pack_steps(1);
+    ok &= pack_same_set(keep, TSEL->pack, 16) && TSEL->p[P_RUDI] == TSEL->pack[0] && rudi_pack_pos(TSEL) == 0;
+    bad += check("PACK: RESHUF plays the lap in order, then shuffles the pack for the next", ok);
+    TSEL->p[P_RUDCH] = 1;
+    song.playing = 0;
+    n = project_save(1);
+    memset(TSEL->pack, 0, RUDI_PACK); TSEL->npack = 0; TSEL->p[P_RUDCH] = 0;
+    project_load(1); frame();
+    ok = n == 0u && TSEL->npack == 16 && pack_same_set(keep, TSEL->pack, 16) && TSEL->p[P_RUDCH] == 1 && TSEL->p[P_RUDREP] == 1;
+    bad += check("PACK: a project saves each track's pack, CHAIN and REPS, and loads them back", ok);
+    go_page(GR_PACK); frame();
+    press(B_REC); frames(20);
+    tap_key(white(7));
+    ok = pk.fill && pk.n == 1 && TSEL->npack == 1;
+    go_page(GR_ROLL); frame();
+    ok &= !pk.fill && TSEL->npack == 1 && TSEL->pack[0] == rk.bank * RK_BANK + 7u && song.grid == 0u && msg_is("1 IN THE PACK");   /* (the bank: RUDMT's) */
+    hold(B_SAVE); frame();
+    ok &= TSEL->npack == 16;                          /* (the fill undone: the 16 back) */
+    go_page(GR_PACK); frame();
+    press(B_REC); frames(20);
+    ok &= pk.fill;
+    press(B_REC); frames(20);
+    ok &= !pk.fill && TSEL->npack == 16 && msg_is("PACK KEPT");   /* (nothing tapped: the pack stays) */
+    bad += check("PACK: another page ends a fill with what was tapped; REC twice keeps the pack; SAVE held undoes a fill", ok);
+    TSEL->p[P_RUDION] = 0; frame();
+    ok = song.grid == 0u && !pack_keys_on();
+    press(B_REC); frames(20);
+    ok &= !pk.fill && song.rec != 0u;                 /* (RUDI off: REC arms, as anywhere) */
+    bad += check("PACK: with RUDI off the page's keys play the track and REC arms as anywhere", ok);
+    song.rec = 0;
+    return bad;
+}
 static int test_rudi_keys(void)                   /* RudiSeq RUDI KEYS: the keyboard picks the rudiment on the RUDI pages */
 {
     int bad = 0, ok;
@@ -10296,6 +10437,7 @@ int main(void)
     bad += test_rudi_print_to();
     bad += test_style_max();
     bad += test_rudi_keys();
+    bad += test_pack();
     bad += test_layer_knob_leak();
     bad += test_layer_knob_race();
     bad += test_fx_latch();
