@@ -23,6 +23,9 @@ another, with the accents, ghosts and grace notes of the real sticking.
 - **Hand probability** (PRB R / PRB L): thin out one hand to open up the groove.
 - **Random notes on the scale** (RUDI 3: RNG R / RNG L, CHG): a hand wanders over up to two octaves above
   its note, on the track's SCL scale, picking anew on CHG % of its hits. A bass that walks, a kit that roams.
+- **RUDI KEYS** (the RUDI pages while RUDI is on): the 16 white keys are 16 rudiments, the 11 black keys the
+  banks of 16: tap to switch and stay, hold to play one while held. Jam rudiments live, any jump; the panel shows
+  the bank's names, the LEDs the current rudiment and bank.
 - **STYLE FLAT MAX / LINE MAX** (MENU > DISPLAY > STYLE): every label, unit and note letter in the full text
   colour instead of a 70 % blend, and the quick layers' cell names (SEQ TOOLS, GLO, FX) in it too, for the LCD in
   daylight (the backlight has no dimmer: it is always at full).
@@ -64,7 +67,7 @@ Felucca's installer and web editor work with a RudimentSeq device: they accept b
 
 ## Status
 
-r0.1.5, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
+r0.1.6, built on Felucca v1.9.0. Tested on one FM-1 (hardware revision with the UC25HQ80 flash).
 The host test suite runs green but for one upstream text-spacing check. Please report problems in
 the issues of this repository (https://github.com/RudimentSeq/RudimentSeq-FM1), not to Felucca's author. Contact: jem@rudimentseq.com.
 

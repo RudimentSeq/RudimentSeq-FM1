@@ -613,6 +613,29 @@ static int detail_on(void)
 /* GLO > SONG (1.2): the white keys A B C D (A3 B3 C4 D4, white places 2..5: seq.c song_key) set the selected cell's slot;
  * they do not sound there, the other keys play as anywhere (seq.c keyboard_block: song.grid 3) */
 static int song_keys_on(void) { return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_SONG; }
+/* RudiSeq RUDI KEYS (2026-11-24): on the RUDI pages while the selected track's RUDI is on (song.grid 4: seq.c
+ * keyboard_block, every key silent, as NAME), the white keys F3..G5 pick a rudiment of the bank (16 a bank) and the
+ * black keys F#3..F#5 the bank (11 banks: 174 rudiments). A white key sets RUDMT at once (the lane takes it on its next
+ * hit): let go within RK_HOLD_MS it stays (a tap latches), held longer it goes back to the one before (a hold plays it
+ * while held). The bank follows RUDMT when the knob moves it. The panel shows the bank's 16 names for RK_SHOW_MS after
+ * any of these keys (ui_graph.c graph_rudi); the key LEDs light the rudiment's key and the bank's (ui_input.c rudi_keys,
+ * rudi_leds) */
+#define RK_HOLD_MS 500u
+#define RK_SHOW_MS 2500u
+#define RK_BANK 16u
+#define RK_BANKS ((NUM_RUDIMENTS + RK_BANK - 1u) / RK_BANK)
+static struct {
+    uint8_t on;                  /* the keys are the rudiments' (reset when they are not: the bank starts at RUDMT's) */
+    uint8_t bank;                /* the bank the white keys pick from */
+    uint8_t key;                 /* the white key down + 1 (0: none): a hold goes back to prev when it is let go */
+    int16_t prev, seen;          /* RUDMT before the key; RUDMT as the keys last left it (the knob moved it: the bank follows) */
+    uint32_t t0, show;           /* the key's press time; the last key's time (the panel shows the bank for RK_SHOW_MS) */
+} rk;
+static int rudi_keys_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_RUDI && TSEL->p[P_RUDION] != 0;
+}
+static int rudi_bank_shown(void) { return rk.on && rk.show && fm1_ms - rk.show < RK_SHOW_MS; }
 
 /* black key place p (seq.c key_place) held, 0 = not */
 static int black_held(uint32_t p)

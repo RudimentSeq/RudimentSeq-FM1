@@ -806,7 +806,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
        S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
        S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD,
-       S_PROJECT_PLAYING, S_USER_PLAYING, S_SEQ_TOOLS_PRINT, S_SEQ_TOOLS_PRINT_DRUM, S_SEQ_TOOLS_PRINT_MAX, S_MENU_STYLE_MAX, S_COUNT };   /* RudiSeq: SAVE picked while the transport runs */
+       S_PROJECT_PLAYING, S_USER_PLAYING, S_SEQ_TOOLS_PRINT, S_SEQ_TOOLS_PRINT_DRUM, S_SEQ_TOOLS_PRINT_MAX, S_MENU_STYLE_MAX, S_RUDI_KEYS, S_RUDI_KEYS_LAST, S_COUNT };   /* RudiSeq: SAVE picked while the transport runs */
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -838,7 +838,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
     "layer_seq_euclid_64",
     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
     "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold",
-    "project_playing", "user_playing", "seq_tools_print", "seq_tools_print_drum", "seq_tools_print_max", "menu_style_max"};
+    "project_playing", "user_playing", "seq_tools_print", "seq_tools_print_drum", "seq_tools_print_max", "menu_style_max", "rudi_keys", "rudi_keys_last"};
 
 /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
@@ -1416,6 +1416,8 @@ static void setup(int s)
     case S_SEQ_TOOLS_PRINT_DRUM: drum(0); TSEL->p[P_RUDION] = 1; go_page(GR_ROLL); ui.lane = 2; ui.layer = LAYER_SEQ; break;
     case S_SEQ_TOOLS_PRINT_MAX: TSEL->p[P_RUDION] = 1; go_page(GR_ROLL); ui.layer = LAYER_SEQ; ui_style = ST_MAX; break;   /* RudiSeq: STYLE FLAT MAX */
     case S_MENU_STYLE_MAX: ui.menu = 1; ui.menu_sel = MI_STYLE; ui_style = ST_MAX; break;
+    case S_RUDI_KEYS: TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 15; go_page(GR_RUDI); rk.on = 1; rk.bank = 0; rk.seen = 15; rk.show = fm1_ms ? fm1_ms : 1u; break;   /* RudiSeq: the bank's names */
+    case S_RUDI_KEYS_LAST: TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 170; go_page(GR_RUDI); rk.on = 1; rk.bank = 10; rk.seen = 170; rk.show = fm1_ms ? fm1_ms : 1u; break;
     case S_SEQ_TOOLS_SONG: drum(1); go_page(GR_ROLL); ui.lane = 5; chain.running = 1; ui.layer = LAYER_SEQ; break;
     /* 1.4.1 ENGINE QUICK ACTIONS: the EDIT layer on a DRUM track, KICK and HATOP muted (the black keys' row); on KIT 77
      * (CL CY), CL muted; the grid with SD (the lane selected) and OH muted. A non-DRUM track's map: layer_edit_active */

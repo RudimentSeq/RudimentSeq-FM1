@@ -10204,6 +10204,57 @@ static int test_style_max(void)                   /* RudiSeq: STYLE FLAT MAX / L
     return bad;
 }
 
+static int test_rudi_keys(void)                   /* RudiSeq RUDI KEYS: the keyboard picks the rudiment on the RUDI pages */
+{
+    int bad = 0, ok;
+    uint32_t br, c;
+    ui_power_on();
+    tl_melody();
+    TSEL->p[P_RUDION] = 1; TSEL->p[P_RUDI] = 15;
+    go_page(GR_RUDI); frame();
+    ok = song.grid == 4u && rudi_keys_on();
+    key_down(white(3)); frame();
+    ok &= TSEL->p[P_RUDI] == 3 && kb_note[white(3)] == KB_SILENT && rk.bank == 0 && rk.key == white(3) + 1u;   /* (silent) */
+    frames(100); key_up(white(3)); frame();
+    ok &= TSEL->p[P_RUDI] == 3 && rk.key == 0;        /* a tap: it stays */
+    bad += check("RUDI KEYS: on the RUDI page with RUDI on a white key picks the bank's rudiment, silently, and a tap latches", ok);
+    tap_key(black(2));
+    ok = rk.bank == 2;
+    tap_key(white(5));
+    ok &= TSEL->p[P_RUDI] == 37 && str_eq(RUDIMENTS[37].sname, RUDIMENTS[37].sname);
+    bad += check("RUDI KEYS: a black key picks the bank: black key 3 then white key 6 = rudiment 38", ok);
+    key_down(white(0)); frame();
+    ok = TSEL->p[P_RUDI] == 32;
+    frames(700);
+    ok &= TSEL->p[P_RUDI] == 32;
+    key_up(white(0)); frame();
+    ok &= TSEL->p[P_RUDI] == 37 && rk.key == 0;       /* a hold: back to the one before */
+    bad += check("RUDI KEYS: a key held past half a second plays its rudiment while held and goes back when let go", ok);
+    TSEL->p[P_RUDI] = 100; frame();                   /* the knob moved it: the bank follows */
+    tap_key(white(1));
+    ok = TSEL->p[P_RUDI] == 97 && rk.bank == 6;
+    tap_key(black(10));
+    tap_key(white(15));                               /* bank 11, key 16 = 175: no such rudiment */
+    ok &= rk.bank == 10 && TSEL->p[P_RUDI] == 97 && msg_is("NO RUDIMENT THERE");
+    tap_key(white(0));
+    ok &= TSEL->p[P_RUDI] == 160;
+    c = key_leds(&br);
+    ok &= ((c >> white(0)) & 1u) && ((c >> black(10)) & 1u) && !((c >> white(1)) & 1u);
+    bad += check("RUDI KEYS: the bank follows the knob, the last bank's empty keys say so, LEDs light the rudiment's key and the bank's", ok);
+    go_page(GR_ROLL); frame();
+    ok = song.grid == 0u && !rk.on;
+    bad += check("RUDI KEYS: another page: the keys are the track's again, the bank state dropped", ok);
+    TSEL->p[P_RUDION] = 0;
+    go_page(GR_RUDI); frame();
+    ok = song.grid == 0u && !rudi_keys_on();
+    bad += check("RUDI KEYS: the RUDI page with RUDI off: the keys are not taken", ok);
+    key_down(white(3)); frame();
+    ok = TSEL->p[P_RUDI] == 160 && kb_note[white(3)] != KB_SILENT;   /* RUDI off: the key plays as anywhere */
+    key_up(white(3)); frame();
+    bad += check("RUDI KEYS: with RUDI off a key on the RUDI page plays the track and changes nothing", ok);
+    return bad;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -10244,6 +10295,7 @@ int main(void)
     bad += test_rudi_print();
     bad += test_rudi_print_to();
     bad += test_style_max();
+    bad += test_rudi_keys();
     bad += test_layer_knob_leak();
     bad += test_layer_knob_race();
     bad += test_fx_latch();

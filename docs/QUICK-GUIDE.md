@@ -1,6 +1,6 @@
 # RudimentSeq on the FM-1: quick guide
 
-Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.5, 2026-11-23.
+Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki (Controls, Menu, Features) and the firmware. r0.1.6, 2026-11-25.
 
 ![FM-1 controls](controls.jpg)
 
@@ -18,7 +18,7 @@ Felucca v1.9.0 controls plus the RudimentSeq additions. Sources: Felucca's wiki 
 | **PLAY** | Start / stop all four tracks (green while playing) |
 | **REC** | Arms the track to record, on every page; stopped, it starts playing too |
 | **OCT− / OCT+** | Octave down / up. In dialogs and the menu: OCT+ does it, OCT− goes back. Both together: octave reset |
-| **Keys** | Play the selected track, F3 to G5. On SEQ > STEP they enter notes (drum track: white keys = steps, black keys = lanes) |
+| **Keys** | Play the selected track, F3 to G5. On SEQ > STEP they enter notes (drum track: white keys = steps, black keys = lanes). On the RUDI pages while RUDI is on: white keys pick a rudiment, black keys the bank (**RUDI KEYS**, below) |
 
 ## Five rules
 
@@ -99,6 +99,7 @@ White keys from F3: the engines in order ANALOG, FM6, PHASE, LOFI, SAMPLE, VOICE
 - **MIDI out** is automatic: the sequencer, the lanes and the arp go out over USB on each track's channel, and no note is ever left hanging.
 - **HOME > CLOCK, KNOB 4 SYNC ON**: MIDI clock, Start and Stop out when the FM-1 is the clock master.
 - **PRINT** (hold SEQ, tap E4 while RUDI is on): the lane's next LEN steps are written into the track's steps, as they would have played (the rate, probabilities, SMART, accents, RUDI 3's notes as they fall), and RUDI goes OFF: the track plays the print, and every step tool works on it. LEN and DIV set the length: 64 steps at 1/16 is 4 bars, at 1/8 8 bars. SAVE held undoes it (RUDI back on); RUDI on again and PRINT again for another roll.
+- **RUDI KEYS** (on RUDI, RUDI 2 or RUDI 3 while RUDI is on): the 16 white keys F3 to G5 are 16 rudiments, the 11 black keys F#3 to F#5 are the banks of 16 (174 rudiments, 11 banks). Tap a white key and the lane plays that rudiment from its next hit and stays on it; hold it past half a second and it plays while held, then goes back. The panel shows the bank's 16 names for a moment after any of these keys, the playing one filled; the key LEDs light the rudiment's key and the bank's. The RUDMT knob still works and the bank follows it. Keys do not sound here; with RUDI off, or on any other page, they play the track as always.
 - **PRINT TO** (hold SEQ, tap black key 1 to 4 while RUDI is on): the same print, into track 1 to 4 (its LEN; its own RUDI goes OFF so you hear the print), and the lane keeps rolling on the track it is on: layer a rudiment's rolls onto the other tracks while it plays. SAVE held undoes it on that track.
 - **To hear only a rudiment lane**: hold GLO and mute the other tracks on the black keys (or solo its white key), or set MUTE on HOME > MIXER.
 

@@ -48,6 +48,18 @@ Unchanged: the update loader, the hardware layer (`firmware/bsp/`, MPL-2.0), the
 (`firmware/engines/`, MIT), the package identity FM-1_900 and the USB ids, so Felucca's installer,
 M-VAVE's updater and the recovery paths all still apply.
 
+## 2026-11-25: RUDI KEYS, the keyboard picks the rudiment (r0.1.6)
+
+- `ui.c` rk, rudi_keys_on: on a RUDI page while the selected track's RUDI is on the keys are the rudiments'
+  (song.grid 4; `ui_name.c` keys_mode; `seq.c` keyboard_block mutes every key, as NAME). `ui_input.c` rudi_keys:
+  a white key F3..G5 sets RUDMT to the bank's rudiment at once (the lane takes it on its next hit); let go within
+  500 ms it stays, held longer it goes back to the one before (RK_HOLD_MS); a black key F#3..F#5 picks the bank
+  (11 of 16); the bank follows RUDMT when the knob moves it; the last bank's empty keys say NO RUDIMENT THERE.
+  rudi_leds: the rudiment's white key and the bank's black key lit. `ui_graph.c` graph_rudi: for 2.5 s after
+  any of these keys the panel shows the bank's 16 short names with the keys' letters, RUDMT's
+  filled, two columns of eight rows (the bank: the lit black key).
+- `core.h`: RUDISEQ_VERSION r0.1.6. `tests/ui_test.c`: test_rudi_keys (7 checks); `tests/ui_render.c`: two scenes.
+
 ## 2026-11-23: STYLE FLAT MAX / LINE MAX, the text at full (r0.1.5)
 
 - `gfx.c` ux.hi, ST_MAX: ui_style 3 / 4 = FLAT / LINE with MID set to TEXT and DIM to MID's blend (palette_set);

@@ -396,9 +396,11 @@ static void graph_rudi(const track_t *t, uint16_t c)
     uint32_t k = trk_index(t), n = rd->nHits, cols = n > 32u ? 32u : n, i, per;
     uint32_t cur = 0xFFFFu;
     int32_t w, bw, x0, x;
-    char b[24];
+    char b[32];
     if (song.playing && t->p[P_RUDION])
         cur = (rudi[k].hit + n - 1u) % n;            /* rudi_step already advanced past it */
+    if (t == TSEL && rudi_bank_shown())
+        goto bank;                                   /* (RudiSeq RUDI KEYS: the bank takes the panel) */
     if (t->p[P_RUDION]) {
         b[0] = '#';
         fmt_int(b + 1, rd->id);
@@ -416,6 +418,28 @@ static void graph_rudi(const track_t *t, uint16_t c)
     str_cpy(b + i, rd->triplet ? " HITS TRIP" : " HITS 16TH", 11);
     cv_text_r(228, 2, &AF_S, b, T_MID, T_SURF);
     cv_text(10, 16, &AF_M, rd->name, T_TEXT);
+bank:
+    if (t == TSEL && rudi_bank_shown()) {            /* RudiSeq RUDI KEYS: the bank's 16 names in place of the strip,
+                                                      * two columns of eight (the keys' letters; RUDMT's filled, the
+                                                      * empty ones dark); the bank: the lit black key */
+        static const char KEY[RK_BANK] = {'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'A', 'B', 'C', 'D', 'E', 'F', 'G'};
+        uint32_t j;
+        for (j = 0; j < RK_BANK; j++) {
+            uint32_t r = rk.bank * RK_BANK + j;
+            int32_t cx = 10 + 112 * (int32_t)(j / 8u), cy = 2 + 13 * (int32_t)(j % 8u);
+            int here = r == rud;
+            uint16_t fill = here ? T_THEME : T_RAISE, ink = here ? T_INK : r < NUM_RUDIMENTS ? T_TEXT : T_DIM;
+            char lt[2] = {KEY[j], 0};
+            cv_rrect(cx, cy, 106, 12, 3, fill, T_SURF);
+            GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
+            cv_text_on(cx + 4, cy + CAP_IN(S, 12), &AF_S, lt, here ? T_INK : T_MID, fill);
+            if (r < NUM_RUDIMENTS) {
+                GFX_HOOK_ALIGN(0, cy, 0, cy + 12, AL_V, "rudi bank row on its middle");
+                cv_text_r(cx + 102, cy + CAP_IN(S, 12), &AF_S, RUDIMENTS[r].sname, ink, fill);
+            }
+        }
+        return;
+    }
 
     w = clamp(216 / (int32_t)cols, 4, 14);           /* the strip, centred */
     bw = w > 5 ? w - 2 : w - 1;

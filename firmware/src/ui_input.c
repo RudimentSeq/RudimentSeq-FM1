@@ -341,6 +341,7 @@ static uint32_t scale_leds(uint32_t *root)
 }
 
 static uint32_t song_leds(void);
+static uint32_t rudi_leds(void);                        /* (RudiSeq RUDI KEYS, below) */
 /* MENU > ANIM IDLE (1.2, Discussion #135): after IDLE_LEDS_MS without panel input (ui.c scrn.idle: a button or key
  * pressed or held, a knob turned; what SCREEN OFF counts) the LEDs play the idle animation (bsp/boards/fm1/fm1_led_anim.h
  * fm1_idle_level: a soft light drifting over the keys and back, the buttons breathing with it; the scan draws it,
@@ -374,7 +375,8 @@ static uint32_t key_leds(uint32_t *br)                 /* (*br: a layer's keys t
     if (br)
         *br = 0;
     c = name_on() && !ui.menu ? name_leds() : ui.layer ? layer_leds(br) : grid_on() ? grid_leds() :
-                 (fm1_in.notes & ~kb_layer) | play_leds() | step_leds() | (song_keys_on() ? song_leds() : 0u);
+                 (fm1_in.notes & ~kb_layer) | play_leds() | step_leds() | (song_keys_on() ? song_leds() : 0u) |
+                 (rudi_keys_on() ? rudi_leds() : 0u);   /* (RudiSeq RUDI KEYS) */
 #if FELUCCA_SLICE
     if (!ui.layer && !ui.menu && !name_on() && slice_page_on())
         c |= slice_leds();                              /* SLICES: and the keys of the selected slice */
@@ -573,6 +575,71 @@ static void song_keys(uint32_t notes)
         chain_config.row[ui.song_row].slot[ui.song_trk % NTRK] = (uint8_t)s;
         ui.force = 1;
     }
+}
+/* RudiSeq RUDI KEYS (ui.c rk): the keys newly down this pass, and the white key let go */
+static void rudi_keys(uint32_t notes)
+{
+    track_t *t = TSEL;
+    uint32_t k, cur = fm1_in.notes, rud = (uint32_t)t->p[P_RUDI] % NUM_RUDIMENTS;
+    if (!rk.on) {                                       /* the keys just became the rudiments': RUDMT's bank */
+        rk.on = 1;
+        rk.bank = (uint8_t)(rud / RK_BANK);
+        rk.seen = (int16_t)rud;
+        rk.key = 0;
+        rk.show = 0;
+    }
+    if ((uint32_t)rk.seen != rud) {                     /* the knob (or the editor) moved it: the bank follows */
+        rk.bank = (uint8_t)(rud / RK_BANK);
+        rk.seen = (int16_t)rud;
+    }
+    for (k = 0; k < 27u; k++) {
+        uint32_t p, r;
+        if (!((notes >> k) & 1u))
+            continue;
+        p = key_place(k);
+        if (key_black(k)) {                             /* a black key: the bank */
+            if (p < RK_BANKS) {
+                rk.bank = (uint8_t)p;
+                rk.show = fm1_ms ? fm1_ms : 1u;
+                ui.force = 1;
+            }
+            continue;
+        }
+        if (p >= RK_BANK)
+            continue;
+        r = rk.bank * RK_BANK + p;
+        rk.show = fm1_ms ? fm1_ms : 1u;
+        ui.force = 1;
+        if (r >= NUM_RUDIMENTS) {                       /* (the last bank's empty keys) */
+            ui_message("NO RUDIMENT THERE");
+            continue;
+        }
+        if (!rk.key)
+            rk.prev = t->p[P_RUDI];                     /* (what a hold goes back to) */
+        rk.key = (uint8_t)(k + 1u);
+        rk.t0 = fm1_ms;
+        t->p[P_RUDI] = (int16_t)r;                      /* (the lane takes it on its next hit: rudi.c rudi_step) */
+        rk.seen = (int16_t)r;
+    }
+    if (rk.key && !((cur >> (rk.key - 1u)) & 1u)) {     /* the key let go: a tap stays, a hold goes back */
+        if (fm1_ms - rk.t0 >= RK_HOLD_MS) {
+            t->p[P_RUDI] = rk.prev;
+            rk.seen = rk.prev;
+            ui.force = 1;
+        }
+        rk.key = 0;
+    }
+}
+/* their LEDs: RUDMT's white key and the bank's black key */
+static uint32_t rudi_leds(void)
+{
+    uint32_t k, m = 0, rud = (uint32_t)TSEL->p[P_RUDI] % NUM_RUDIMENTS, bank = rk.on ? rk.bank : rud / RK_BANK;
+    for (k = 0; k < 27u; k++) {
+        uint32_t p = key_place(k);
+        if (key_black(k) ? p == bank : rud / RK_BANK == bank && p == rud % RK_BANK)
+            m |= 1u << k;
+    }
+    return m;
 }
 /* the key LEDs of SONG: the key of the selected cell's slot (none for "-" and on + ADD) */
 static uint32_t song_leds(void)
@@ -1779,8 +1846,12 @@ static void ui_input(void)
         slice_keys_pick(notes);
 #endif
     lock_keys();                                        /* (a grid key on a hit let go: the hit goes) */
+    if (song.grid != 4u)
+        rk.on = 0;                                      /* (RudiSeq: the rudiment keys start afresh next time) */
     if (song.grid == 3u) {
         song_keys(notes);
+    } else if (song.grid == 4u) {
+        rudi_keys(notes);                               /* RudiSeq RUDI KEYS (ui.c) */
     } else if (song.grid) {
         grid_keys(notes);
     } else if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* STEP */
